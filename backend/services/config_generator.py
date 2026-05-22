@@ -137,20 +137,31 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
             "  local from_domain = msg:from_header():domain()",
         ]
         for key in dkim_keys:
-            # Private key is stored at: /var/lib/kumomta/data/dkim/<domain>/<selector>.key
             key_path = f"{KUMOMTA_DKIM_DIR}/{key.domain}/{key.selector}.key"
             lines += [
                 f"  if from_domain == '{key.domain}' then",
-                "    local signer = kumo.dkim.rsa_sha256_signer {",
-                f"      domain = '{key.domain}',",
-                f"      selector = '{key.selector}',",
-                "      headers = { 'From', 'To', 'Subject', 'Date', 'Message-Id' },",
-                f"      key = '{key_path}',",
-                "    }",
-                "    msg:dkim_sign(signer)",
+                "    local ok, err = pcall(function()",
+                "      local signer = kumo.dkim.rsa_sha256_signer {",
+                f"        domain = '{key.domain}',",
+                f"        selector = '{key.selector}',",
+                "        headers = { 'From', 'To', 'Subject', 'Date', 'Message-Id' },",
+                f"        key = '{key_path}',",
+                "      }",
+                "      msg:dkim_sign(signer)",
+                "    end)",
+                "    if not ok then",
+                f"      kumo.log('WARN', 'DKIM signing failed for {key.domain}: ' .. tostring(err))",
+                "    end",
                 "  end",
             ]
         lines += ["end)", ""]
+    else:
+        lines += [
+            "kumo.on('smtp_server_message_received', function(msg)",
+            "  -- No DKIM keys configured yet",
+            "end)",
+            "",
+        ]
 
     # -----------------------------------------------------------
     # Egress path config: inline per-domain throttling
