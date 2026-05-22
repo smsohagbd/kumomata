@@ -79,6 +79,16 @@ def _get_migrations() -> list[str]:
         "ALTER TABLE ip_addresses ADD COLUMN hostname VARCHAR(255)",
         "ALTER TABLE domain_rules ADD COLUMN egress_pool VARCHAR(128)",
 
+        # smtp_users table
+        f"""CREATE TABLE IF NOT EXISTS smtp_users (
+            id {serial} PRIMARY KEY {auto_inc},
+            username VARCHAR(255) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            description VARCHAR(255),
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""",
+
         # email_logs table
         f"""CREATE TABLE IF NOT EXISTS email_logs (
             id {serial} PRIMARY KEY {auto_inc},

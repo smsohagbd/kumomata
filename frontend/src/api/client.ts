@@ -58,6 +58,11 @@ export const clearQueue = () => api.post("/api/deploy/clear-queue").then(d);
 // --- DB Info ---
 export const getDatabaseInfo = () => api.get("/api/settings/database-info").then(d);
 
+// --- SMTP Users ---
+export const getSmtpUsers = () => api.get("/api/smtp-users").then(d);
+export const createSmtpUser = (data: object) => api.post("/api/smtp-users", data).then(d);
+export const deleteSmtpUser = (id: number) => api.delete(`/api/smtp-users/${id}`).then(d);
+
 // --- Suppressions ---
 export const getSuppressions = () => api.get("/api/suppressions").then(d);
 export const addSuppression = (email: string, reason?: string) => api.post("/api/suppressions", { email, reason }).then(d);

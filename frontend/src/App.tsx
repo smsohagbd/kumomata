@@ -8,6 +8,7 @@ import ConfigPreview from "./pages/ConfigPreview";
 import SettingsPage from "./pages/SettingsPage";
 import LogsPage from "./pages/LogsPage";
 import SuppressionList from "./pages/SuppressionList";
+import SmtpUsers from "./pages/SmtpUsers";
 
 export default function App() {
   return (
@@ -20,7 +21,8 @@ export default function App() {
           <Route path="/dkim" element={<DKIMPage />} />
           <Route path="/config" element={<ConfigPreview />} />
           <Route path="/logs" element={<LogsPage />} />
-          <Route path="/suppressions" element={<SuppressionList />} />
+              <Route path="/suppressions" element={<SuppressionList />} />
+              <Route path="/smtp-users" element={<SmtpUsers />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

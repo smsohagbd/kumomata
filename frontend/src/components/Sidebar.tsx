@@ -9,6 +9,7 @@ import {
   Mail,
   ScrollText,
   ShieldOff,
+  KeyRound,
 } from "lucide-react";
 
 const nav = [
@@ -16,6 +17,7 @@ const nav = [
   { to: "/ips", label: "IP Addresses", icon: Server },
   { to: "/domains", label: "Domain Rules", icon: Globe },
   { to: "/dkim", label: "DKIM Keys", icon: ShieldCheck },
+  { to: "/smtp-users", label: "SMTP Users", icon: KeyRound },
   { to: "/config", label: "Config & Deploy", icon: FileCode },
   { to: "/logs", label: "Logs", icon: ScrollText },
   { to: "/suppressions", label: "Suppression List", icon: ShieldOff },

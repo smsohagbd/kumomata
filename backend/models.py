@@ -69,6 +69,17 @@ class DKIMKey(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class SmtpUser(Base):
+    """SMTP relay credentials — authenticate from external software."""
+    __tablename__ = "smtp_users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)   # bcrypt / sha256 hex
+    description = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class SuppressedEmail(Base):
     """Emails that permanently bounced — never send to these again."""
     __tablename__ = "suppressed_emails"
