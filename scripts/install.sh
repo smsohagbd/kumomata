@@ -51,8 +51,11 @@ if node --version 2>/dev/null | grep -qE '^v(20|22|24)'; then
     warn "Node.js $(node --version) already installed — skipping"
 else
     info "Installing Node.js ${NODE_MAJOR} LTS (Ubuntu ships v12 which is too old)..."
+    # Remove old conflicting packages before upgrading
+    apt-get remove -y libnode-dev libnode72 nodejs npm 2>/dev/null || true
+    apt-get autoremove -y -q 2>/dev/null || true
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
-    apt-get install -y -q nodejs
+    apt-get install -y nodejs
     success "Node.js $(node --version) installed"
 fi
 
