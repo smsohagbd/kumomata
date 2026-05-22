@@ -5,9 +5,48 @@ import glob
 from datetime import datetime
 from fastapi import APIRouter, Query
 
+try:
+    import zstandard as zstd
+    HAS_ZSTD = True
+except ImportError:
+    HAS_ZSTD = False
+
 router = APIRouter(prefix="/api/logs", tags=["Logs"])
 
 KUMOMTA_LOG_DIR = os.getenv("KUMOMTA_LOG_DIR", "/var/log/kumomta")
+
+
+def _read_log_file(filepath: str) -> list[str]:
+    """Read a KumoMTA log file — handles both zstd-compressed and plain text."""
+    # Try zstd decompression first
+    if HAS_ZSTD:
+        try:
+            dctx = zstd.ZstdDecompressor()
+            with open(filepath, "rb") as f:
+                raw = f.read()
+            if raw:
+                text = dctx.decompress(raw, max_output_size=50 * 1024 * 1024)
+                return text.decode("utf-8", errors="replace").splitlines()
+        except Exception:
+            pass
+
+    # Fallback: try subprocess zstdcat (if zstd binary is installed)
+    try:
+        result = subprocess.run(
+            ["zstdcat", filepath],
+            capture_output=True, timeout=10,
+        )
+        if result.returncode == 0 and result.stdout:
+            return result.stdout.decode("utf-8", errors="replace").splitlines()
+    except Exception:
+        pass
+
+    # Last resort: plain text
+    try:
+        with open(filepath, "r", errors="replace") as f:
+            return f.readlines()
+    except Exception:
+        return []
 
 
 def _read_journal(unit: str, lines: int = 100) -> list[dict]:
@@ -100,8 +139,7 @@ def email_logs(lines: int = Query(default=200, le=1000)):
         all_lines = []
         for filepath in reversed(log_files):
             try:
-                with open(filepath, "r") as f:
-                    file_lines = [l for l in f.readlines() if l.strip()]
+                file_lines = [l for l in _read_log_file(filepath) if l.strip()]
                 all_lines.extend(reversed(file_lines))
                 if len(all_lines) >= lines:
                     break
