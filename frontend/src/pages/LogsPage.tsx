@@ -13,10 +13,16 @@ interface EmailRecord {
   sender: string;
   recipient: string;
   queue: string;
+  site: string;
+  code: number;
   response: string;
   size: number;
   num_attempts: number;
-  disposition: string;
+  peer_ip: string;
+  egress_pool: string;
+  egress_source: string;
+  bounce_class: string;
+  id: string;
 }
 
 type MainTab = "email" | "system";
@@ -143,23 +149,39 @@ function EmailLogs() {
               <tr>
                 <th>Time</th>
                 <th>Type</th>
+                <th>Code</th>
                 <th>From</th>
                 <th>To</th>
-                <th>Response</th>
-                <th>Attempts</th>
+                <th>Server Response</th>
+                <th>IP / Source</th>
+                <th>Tries</th>
                 <th>Size</th>
               </tr>
             </thead>
             <tbody>
               {records.map((r, i) => (
                 <tr key={i}>
-                  <td className="text-gray-500 text-xs whitespace-nowrap">
-                    {r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : "—"}
-                  </td>
+                  <td className="text-gray-500 text-xs whitespace-nowrap">{r.timestamp || "—"}</td>
                   <td><TypeBadge type={r.type} /></td>
-                  <td className="font-mono text-xs text-gray-300 max-w-[160px] truncate">{r.sender || "—"}</td>
-                  <td className="font-mono text-xs text-gray-300 max-w-[160px] truncate">{r.recipient || "—"}</td>
-                  <td className="text-xs text-gray-400 max-w-[200px] truncate" title={r.response}>{r.response || "—"}</td>
+                  <td>
+                    <span className={`font-mono text-xs font-bold ${
+                      r.code >= 200 && r.code < 300 ? "text-green-400" :
+                      r.code >= 400 && r.code < 500 ? "text-yellow-400" :
+                      r.code >= 500 ? "text-red-400" : "text-gray-400"
+                    }`}>
+                      {r.code || "—"}
+                    </span>
+                  </td>
+                  <td className="font-mono text-xs text-gray-300 max-w-[140px] truncate">{r.sender || "—"}</td>
+                  <td className="font-mono text-xs text-gray-300 max-w-[140px] truncate">{r.recipient || "—"}</td>
+                  <td className="text-xs text-gray-400 max-w-[220px]" title={r.response}>
+                    <span className="truncate block">{r.response || "—"}</span>
+                    {r.bounce_class && <span className="text-orange-400 text-xs">({r.bounce_class})</span>}
+                  </td>
+                  <td className="text-xs text-gray-500">
+                    <div>{r.peer_ip || "—"}</div>
+                    {r.egress_source && <div className="text-purple-400">{r.egress_source}</div>}
+                  </td>
                   <td className="text-center text-gray-400">{r.num_attempts}</td>
                   <td className="text-gray-500 text-xs">{r.size > 0 ? `${(r.size / 1024).toFixed(1)}k` : "—"}</td>
                 </tr>

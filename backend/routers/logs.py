@@ -52,27 +52,57 @@ def frontend_logs(lines: int = Query(default=50, le=200)):
     return {"logs": _read_journal("kumomta-panel-frontend", lines)}
 
 
+def _parse_response(resp) -> dict:
+    """Parse KumoMTA response field into code + message."""
+    if not resp:
+        return {"code": 0, "message": ""}
+    if isinstance(resp, dict):
+        code = resp.get("code", 0)
+        content = resp.get("content", "") or ""
+        enhanced = resp.get("enhanced_code") or ""
+        msg = f"{enhanced} {content}".strip() if enhanced else content
+        return {"code": code, "message": msg}
+    return {"code": 0, "message": str(resp)}
+
+
+def _parse_ts(ts) -> str:
+    """Convert KumoMTA timestamp (Unix float or ISO string) to ISO string."""
+    if not ts:
+        return ""
+    try:
+        if isinstance(ts, (int, float)):
+            return datetime.utcfromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S UTC")
+        return str(ts)
+    except Exception:
+        return str(ts)
+
+
 @router.get("/email")
 def email_logs(lines: int = Query(default=200, le=1000)):
     """
-    Read KumoMTA delivery log files (JSONL format).
-    KumoMTA writes one JSON record per line to /var/log/kumomta/.
-    Each record has: type, timestamp, sender, recipient, queue, response, size
+    Read KumoMTA JSONL delivery log files from /var/log/kumomta/.
+    Returns newest records first with full response code and message.
     """
     records = []
     try:
-        # Find all log files, sort by modification time (newest last)
         pattern = os.path.join(KUMOMTA_LOG_DIR, "*")
         log_files = sorted(glob.glob(pattern), key=os.path.getmtime)
         if not log_files:
-            return {"records": [], "error": f"No log files found in {KUMOMTA_LOG_DIR}. Deploy config first to enable logging."}
+            return {
+                "records": [],
+                "error": (
+                    f"No log files in {KUMOMTA_LOG_DIR}. "
+                    "Go to Config & Deploy → Deploy Config to enable logging, "
+                    "then restart KumoMTA: systemctl restart kumomta"
+                )
+            }
 
         all_lines = []
-        for filepath in reversed(log_files):  # newest files first
+        for filepath in reversed(log_files):
             try:
                 with open(filepath, "r") as f:
-                    file_lines = f.readlines()
-                    all_lines.extend(reversed(file_lines))  # newest lines first
+                    file_lines = [l for l in f.readlines() if l.strip()]
+                all_lines.extend(reversed(file_lines))
                 if len(all_lines) >= lines:
                     break
             except Exception:
@@ -84,20 +114,32 @@ def email_logs(lines: int = Query(default=200, le=1000)):
                 continue
             try:
                 rec = json.loads(raw)
-                # Normalize fields
-                records.append({
-                    "type": rec.get("type", "Unknown"),
-                    "timestamp": rec.get("timestamp", ""),
-                    "sender": rec.get("sender", ""),
-                    "recipient": rec.get("recipient", ""),
-                    "queue": rec.get("queue", ""),
-                    "response": rec.get("response", {}).get("content", "") if isinstance(rec.get("response"), dict) else str(rec.get("response", "")),
-                    "size": rec.get("size", 0),
-                    "num_attempts": rec.get("num_attempts", 0),
-                    "disposition": rec.get("disposition", ""),
-                })
             except json.JSONDecodeError:
                 continue
+
+            resp = _parse_response(rec.get("response"))
+
+            # peer_address may be a dict or string
+            peer = rec.get("peer_address") or {}
+            peer_ip = peer.get("addr", "") if isinstance(peer, dict) else str(peer)
+
+            records.append({
+                "type":         rec.get("type", "Unknown"),
+                "timestamp":    _parse_ts(rec.get("timestamp")),
+                "sender":       rec.get("sender", ""),
+                "recipient":    rec.get("recipient", ""),
+                "queue":        rec.get("queue", ""),
+                "site":         rec.get("site", ""),
+                "code":         resp["code"],
+                "response":     resp["message"],
+                "size":         rec.get("size", 0),
+                "num_attempts": rec.get("num_attempts", 0),
+                "peer_ip":      peer_ip,
+                "egress_pool":  rec.get("egress_pool", ""),
+                "egress_source":rec.get("egress_source", ""),
+                "bounce_class": rec.get("bounce_classification") or "",
+                "id":           rec.get("id", ""),
+            })
 
     except Exception as e:
         return {"records": [], "error": str(e)}
