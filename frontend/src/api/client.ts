@@ -68,4 +68,8 @@ export const getKumoLogs = (lines = 100) => api.get(`/api/logs/kumomta?lines=${l
 export const getBackendLogs = (lines = 100) => api.get(`/api/logs/backend?lines=${lines}`).then(d);
 export const getFrontendLogs = (lines = 50) => api.get(`/api/logs/frontend?lines=${lines}`).then(d);
 export const getEmailLogs = (lines = 200) => api.get(`/api/logs/email?lines=${lines}`).then(d);
-export const getEmailLogsRealtime = (limit = 200) => api.get(`/api/logs/email/realtime?limit=${limit}`).then(d);
+export const getEmailLogsRealtime = (limit = 100, offset = 0, filterType = "all") =>
+  api.get(`/api/logs/email/realtime?limit=${limit}&offset=${offset}&filter_type=${filterType}`).then(d);
+export const deleteEmailLog = (dbId: number) => api.delete(`/api/logs/email/${dbId}`).then(d);
+export const deleteEmailLogsByType = (filterType: string) => api.delete(`/api/logs/email?filter_type=${filterType}`).then(d);
+export const clearQueueByDomain = (domain = "") => api.post(`/api/deploy/clear-queue${domain ? `?domain=${domain}` : ""}`).then(d);

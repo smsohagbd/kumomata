@@ -269,16 +269,26 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/email/realtime")
 def email_logs_realtime(
-    limit: int = Query(default=200, le=1000),
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
+    filter_type: str = Query(default="all"),  # all|delivered|failed|retry|received
     db: Session = Depends(get_db),
 ):
-    """Return email log events from DB (populated in realtime via webhook)."""
-    rows = (
-        db.query(models.EmailLog)
-        .order_by(models.EmailLog.id.desc())
-        .limit(limit)
-        .all()
-    )
+    """Return email log events from DB with pagination and type filtering."""
+    TYPE_MAP = {
+        "delivered": "Delivery",
+        "failed":    "Bounce",
+        "retry":     "TransientFailure",
+        "received":  "Reception",
+    }
+
+    q = db.query(models.EmailLog)
+    if filter_type != "all" and filter_type in TYPE_MAP:
+        q = q.filter(models.EmailLog.event_type == TYPE_MAP[filter_type])
+
+    total = q.count()
+    rows = q.order_by(models.EmailLog.id.desc()).offset(offset).limit(limit).all()
+
     records = [
         {
             "type":         r.event_type,
@@ -296,7 +306,41 @@ def email_logs_realtime(
             "egress_source":r.egress_source or "",
             "bounce_class": r.bounce_class or "",
             "id":           r.message_id or "",
+            "db_id":        r.id,
         }
         for r in rows
     ]
-    return {"records": records, "total": len(records)}
+    return {"records": records, "total": total, "offset": offset, "limit": limit}
+
+
+@router.delete("/email/{db_id}")
+def delete_email_log(db_id: int, db: Session = Depends(get_db)):
+    """Delete a single email log entry from the DB."""
+    row = db.query(models.EmailLog).filter(models.EmailLog.id == db_id).first()
+    if row:
+        db.delete(row)
+        db.commit()
+    return {"ok": True}
+
+
+@router.delete("/email")
+def delete_email_logs_by_type(
+    filter_type: str = Query(default="retry"),
+    db: Session = Depends(get_db),
+):
+    """Delete all log entries of a given type (retry/failed/received)."""
+    TYPE_MAP = {
+        "delivered": "Delivery",
+        "failed":    "Bounce",
+        "retry":     "TransientFailure",
+        "received":  "Reception",
+        "all":       None,
+    }
+    event_type = TYPE_MAP.get(filter_type)
+    q = db.query(models.EmailLog)
+    if event_type:
+        q = q.filter(models.EmailLog.event_type == event_type)
+    count = q.count()
+    q.delete(synchronize_session=False)
+    db.commit()
+    return {"ok": True, "deleted": count}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { RefreshCw, Terminal, Mail, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { RefreshCw, Terminal, Mail, CheckCircle, XCircle, Clock, AlertTriangle, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
-import { getKumoLogs, getBackendLogs, getEmailLogs, getEmailLogsRealtime } from "../api/client";
+import { getKumoLogs, getBackendLogs, getEmailLogs, getEmailLogsRealtime, deleteEmailLog, deleteEmailLogsByType, clearQueueByDomain } from "../api/client";
 
 // ─── Types ────────────────────────────────────────────────
 type LogLevel = "info" | "warn" | "error" | "debug";
@@ -54,27 +54,52 @@ function TypeBadge({ type }: { type: string }) {
   );
 }
 
+type FilterType = "all" | "delivered" | "failed" | "retry" | "received";
+
+const FILTER_LABELS: Record<FilterType, string> = {
+  all:       "All",
+  received:  "Received",
+  delivered: "Delivered",
+  retry:     "Retry",
+  failed:    "Failed",
+};
+const FILTER_COLORS: Record<FilterType, string> = {
+  all:       "text-gray-300",
+  received:  "text-blue-400",
+  delivered: "text-green-400",
+  retry:     "text-yellow-400",
+  failed:    "text-red-400",
+};
+const DELETABLE: FilterType[] = ["retry", "failed", "received"];
+
 // ─── Email Logs Tab ───────────────────────────────────────
 function EmailLogs() {
   const [records, setRecords] = useState<EmailRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 100;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [lines, setLines] = useState(200);
+  const [filter, setFilter] = useState<FilterType>("all");
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [deleting, setDeleting] = useState<number | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = async () => {
+  const load = async (p = page, f = filter) => {
     setLoading(true);
     try {
-      // Try realtime DB first (webhook-populated), fall back to file reader
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let data: any = await getEmailLogsRealtime(lines);
-      if (data.records && data.records.length > 0) {
-        setRecords(data.records);
+      let data: any = await getEmailLogsRealtime(PAGE_SIZE, p * PAGE_SIZE, f);
+      if (data.records && (data.total > 0 || f !== "all")) {
+        setRecords(data.records || []);
+        setTotal(data.total || 0);
         setError("");
       } else {
-        data = await getEmailLogs(lines);
+        // Fall back to file reader only on first page with no filter
+        data = await getEmailLogs(PAGE_SIZE);
         setRecords(data.records || []);
+        setTotal(data.records?.length || 0);
         setError(data.error || "");
       }
     } catch {
@@ -84,50 +109,91 @@ function EmailLogs() {
     }
   };
 
-  useEffect(() => { load(); }, [lines]);
+  useEffect(() => { setPage(0); load(0, filter); }, [filter]);
+  useEffect(() => { load(page, filter); }, [page]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (autoRefresh) intervalRef.current = setInterval(load, 10000);
+    if (autoRefresh) intervalRef.current = setInterval(() => load(page, filter), 10000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [autoRefresh, lines]);
+  }, [autoRefresh, page, filter]);
 
-  const counts = records.reduce((acc, r) => {
-    acc[r.type] = (acc[r.type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const handleDeleteRow = async (dbId: number, queue: string) => {
+    if (!confirm(`Cancel & delete this message?\nQueue: ${queue || "unknown"}`)) return;
+    setDeleting(dbId);
+    try {
+      // Cancel in KumoMTA queue (by domain) + delete from log DB
+      if (queue) await clearQueueByDomain(queue);
+      await deleteEmailLog(dbId);
+      await load(page, filter);
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Delete ALL ${FILTER_LABELS[filter]} log entries? This also cancels queued messages.`)) return;
+    setBulkDeleting(true);
+    try {
+      if (filter === "retry") await clearQueueByDomain(""); // clear all retrying
+      await deleteEmailLogsByType(filter);
+      setPage(0);
+      await load(0, filter);
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const canDelete = DELETABLE.includes(filter);
 
   return (
     <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-2 flex-wrap">
-          {Object.entries(counts).map(([type, count]) => (
-            <span key={type} className="badge-blue text-xs">
-              {type}: {count}
-            </span>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <select
-            className="input py-1.5 text-xs w-28"
-            value={lines}
-            onChange={(e) => setLines(parseInt(e.target.value))}
+      {/* Filter radio buttons */}
+      <div className="flex flex-wrap items-center gap-1 bg-gray-800/50 p-1.5 rounded-xl w-fit">
+        {(Object.keys(FILTER_LABELS) as FilterType[]).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filter === f
+                ? "bg-gray-700 text-white shadow"
+                : `text-gray-500 hover:text-gray-300 ${FILTER_COLORS[f]}`
+            }`}
           >
-            <option value={100}>100 rows</option>
-            <option value={200}>200 rows</option>
-            <option value={500}>500 rows</option>
-            <option value={1000}>1000 rows</option>
-          </select>
+            <span className={filter === f ? "text-white" : FILTER_COLORS[f]}>
+              {FILTER_LABELS[f]}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-xs text-gray-500">
+          {total > 0 ? `${total.toLocaleString()} records` : "No records"}
+          {filter !== "all" && ` · filtered: ${FILTER_LABELS[filter]}`}
+        </p>
+        <div className="flex items-center gap-2">
+          {canDelete && total > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="btn-danger text-xs py-1.5"
+            >
+              <Trash2 size={12} className={bulkDeleting ? "animate-spin" : ""} />
+              {bulkDeleting ? "Deleting..." : `Delete All ${FILTER_LABELS[filter]}`}
+            </button>
+          )}
           <button
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={autoRefresh ? "btn-primary text-xs py-1.5" : "btn-secondary text-xs py-1.5"}
           >
             {autoRefresh ? "Auto ON" : "Auto OFF"}
           </button>
-          <button onClick={load} disabled={loading} className="btn-secondary text-xs py-1.5">
+          <button onClick={() => load(page, filter)} disabled={loading} className="btn-secondary text-xs py-1.5">
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-            Refresh
           </button>
         </div>
       </div>
@@ -144,8 +210,8 @@ function EmailLogs() {
       {records.length === 0 && !error && !loading && (
         <div className="card text-center py-12">
           <Mail size={32} className="mx-auto text-gray-600 mb-3" />
-          <p className="text-gray-400 font-medium">No email logs yet</p>
-          <p className="text-sm text-gray-600 mt-1">Send an email — logs appear within ~10 seconds. Auto-refresh is ON.</p>
+          <p className="text-gray-400 font-medium">No {filter !== "all" ? FILTER_LABELS[filter].toLowerCase() : ""} logs yet</p>
+          <p className="text-sm text-gray-600 mt-1">Send an email — logs appear within ~10 seconds</p>
         </div>
       )}
 
@@ -163,6 +229,7 @@ function EmailLogs() {
                 <th>IP / Source</th>
                 <th>Tries</th>
                 <th>Size</th>
+                {canDelete && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -179,9 +246,9 @@ function EmailLogs() {
                       {r.code || "—"}
                     </span>
                   </td>
-                  <td className="font-mono text-xs text-gray-300 max-w-[140px] truncate">{r.sender || "—"}</td>
-                  <td className="font-mono text-xs text-gray-300 max-w-[140px] truncate">{r.recipient || "—"}</td>
-                  <td className="text-xs text-gray-400 max-w-[220px]" title={r.response}>
+                  <td className="font-mono text-xs text-gray-300 max-w-[130px] truncate">{r.sender || "—"}</td>
+                  <td className="font-mono text-xs text-gray-300 max-w-[130px] truncate">{r.recipient || "—"}</td>
+                  <td className="text-xs text-gray-400 max-w-[200px]" title={r.response}>
                     <span className="truncate block">{r.response || "—"}</span>
                     {r.bounce_class && r.bounce_class !== "Uncategorized" && (
                       <span className="text-orange-400 text-xs">({r.bounce_class})</span>
@@ -193,10 +260,51 @@ function EmailLogs() {
                   </td>
                   <td className="text-center text-gray-400">{r.num_attempts}</td>
                   <td className="text-gray-500 text-xs">{r.size > 0 ? `${(r.size / 1024).toFixed(1)}k` : "—"}</td>
+                  {canDelete && (
+                    <td>
+                      <button
+                        onClick={() => handleDeleteRow((r as EmailRecord & { db_id: number }).db_id, r.queue)}
+                        disabled={deleting === (r as EmailRecord & { db_id: number }).db_id}
+                        className="btn-ghost p-1 text-red-400 hover:text-red-300"
+                        title="Cancel & delete"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => setPage(0)}
+            disabled={page === 0}
+            className="btn-secondary text-xs py-1.5 px-2"
+          >«</button>
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="btn-secondary text-xs py-1.5 px-3"
+          >Prev</button>
+          <span className="text-xs text-gray-400 px-2">
+            Page {page + 1} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="btn-secondary text-xs py-1.5 px-3"
+          >Next</button>
+          <button
+            onClick={() => setPage(totalPages - 1)}
+            disabled={page >= totalPages - 1}
+            className="btn-secondary text-xs py-1.5 px-2"
+          >»</button>
         </div>
       )}
     </div>
