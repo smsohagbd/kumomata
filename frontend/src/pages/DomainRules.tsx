@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Globe, Zap } from "lucide-react";
+import { Plus, Pencil, Trash2, Globe, Zap, RefreshCw, CheckCircle } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Modal from "../components/Modal";
-import { getDomains, createDomain, updateDomain, deleteDomain, createFromPreset, getPresets } from "../api/client";
+import { getDomains, createDomain, updateDomain, deleteDomain, createFromPreset, getPresets, autoDeploy } from "../api/client";
 
 interface DomainRule {
   id: number;
@@ -46,6 +46,8 @@ export default function DomainRules() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deploying, setDeploying] = useState(false);
+  const [deployMsg, setDeployMsg] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -76,6 +78,15 @@ export default function DomainRules() {
     setShowAdd(true);
   };
 
+  const triggerDeploy = async () => {
+    setDeploying(true);
+    setDeployMsg("Applying to KumoMTA...");
+    await autoDeploy();
+    setDeployMsg("KumoMTA updated");
+    setDeploying(false);
+    setTimeout(() => setDeployMsg(""), 3000);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError("");
@@ -87,6 +98,7 @@ export default function DomainRules() {
       }
       setShowAdd(false);
       await load();
+      triggerDeploy();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       setError(err?.response?.data?.detail || "Failed to save rule");
@@ -99,6 +111,7 @@ export default function DomainRules() {
     try {
       await createFromPreset(domain);
       await load();
+      triggerDeploy();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       alert(err?.response?.data?.detail || "Failed to add preset");
@@ -109,6 +122,7 @@ export default function DomainRules() {
     await deleteDomain(id);
     setDeleteId(null);
     await load();
+    triggerDeploy();
   };
 
   const missingPresets = Object.keys(presets).filter(
@@ -121,9 +135,17 @@ export default function DomainRules() {
         title="Domain Rules"
         subtitle="Configure sending limits per destination domain"
         action={
-          <button onClick={openAdd} className="btn-primary">
-            <Plus size={15} /> Add Domain Rule
-          </button>
+          <div className="flex items-center gap-2">
+            {deployMsg && (
+              <span className={`flex items-center gap-1.5 text-xs ${deploying ? "text-yellow-400" : "text-green-400"}`}>
+                {deploying ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                {deployMsg}
+              </span>
+            )}
+            <button onClick={openAdd} className="btn-primary">
+              <Plus size={15} /> Add Domain Rule
+            </button>
+          </div>
         }
       />
 

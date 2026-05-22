@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Server, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Server, ToggleLeft, ToggleRight, RefreshCw, CheckCircle } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Modal from "../components/Modal";
-import { getIPs, createIP, updateIP, deleteIP } from "../api/client";
+import { getIPs, createIP, updateIP, deleteIP, autoDeploy } from "../api/client";
 
 interface IP {
   id: number;
@@ -24,6 +24,17 @@ export default function IPManager() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [deploying, setDeploying] = useState(false);
+  const [deployMsg, setDeployMsg] = useState("");
+
+  const triggerDeploy = async () => {
+    setDeploying(true);
+    setDeployMsg("Applying to KumoMTA...");
+    await autoDeploy();
+    setDeployMsg("KumoMTA updated");
+    setDeploying(false);
+    setTimeout(() => setDeployMsg(""), 3000);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -51,6 +62,7 @@ export default function IPManager() {
       }
       setShowAdd(false);
       await load();
+      triggerDeploy();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       setError(err?.response?.data?.detail || "Failed to save IP");
@@ -63,11 +75,13 @@ export default function IPManager() {
     await deleteIP(id);
     setDeleteId(null);
     await load();
+    triggerDeploy();
   };
 
   const handleToggle = async (ip: IP) => {
     await updateIP(ip.id, { is_active: !ip.is_active });
     await load();
+    triggerDeploy();
   };
 
   const pools = [...new Set(ips.map((ip) => ip.pool_name))];
@@ -78,9 +92,17 @@ export default function IPManager() {
         title="IP Addresses"
         subtitle="Manage your sending IPs and egress pools"
         action={
-          <button onClick={openAdd} className="btn-primary">
-            <Plus size={15} /> Add IP
-          </button>
+          <div className="flex items-center gap-2">
+            {deployMsg && (
+              <span className={`flex items-center gap-1.5 text-xs ${deploying ? "text-yellow-400" : "text-green-400"}`}>
+                {deploying ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                {deployMsg}
+              </span>
+            )}
+            <button onClick={openAdd} className="btn-primary">
+              <Plus size={15} /> Add IP
+            </button>
+          </div>
         }
       />
 

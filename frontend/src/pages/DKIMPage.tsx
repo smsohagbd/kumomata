@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, ShieldCheck, Copy, Check } from "lucide-react";
+import { Plus, Trash2, ShieldCheck, Copy, Check, RefreshCw, CheckCircle } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Modal from "../components/Modal";
-import { getDKIMKeys, generateDKIM, deleteDKIM } from "../api/client";
+import { getDKIMKeys, generateDKIM, deleteDKIM, autoDeploy } from "../api/client";
 
 interface DKIMKey {
   id: number;
@@ -24,6 +24,17 @@ export default function DKIMPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [viewKey, setViewKey] = useState<DKIMKey | null>(null);
   const [copied, setCopied] = useState(false);
+  const [deploying, setDeploying] = useState(false);
+  const [deployMsg, setDeployMsg] = useState("");
+
+  const triggerDeploy = async () => {
+    setDeploying(true);
+    setDeployMsg("Applying to KumoMTA...");
+    await autoDeploy();
+    setDeployMsg("KumoMTA updated");
+    setDeploying(false);
+    setTimeout(() => setDeployMsg(""), 3000);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -40,6 +51,7 @@ export default function DKIMPage() {
       setShowAdd(false);
       setForm({ domain: "", selector: "kumomta" });
       await load();
+      triggerDeploy();
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       setError(err?.response?.data?.detail || "Failed to generate key");
@@ -52,6 +64,7 @@ export default function DKIMPage() {
     await deleteDKIM(id);
     setDeleteId(null);
     await load();
+    triggerDeploy();
   };
 
   const copy = async (text: string) => {
@@ -66,9 +79,17 @@ export default function DKIMPage() {
         title="DKIM Keys"
         subtitle="Generate and manage DKIM signing keys for your domains"
         action={
-          <button onClick={() => { setShowAdd(true); setError(""); }} className="btn-primary">
-            <Plus size={15} /> Generate Key
-          </button>
+          <div className="flex items-center gap-2">
+            {deployMsg && (
+              <span className={`flex items-center gap-1.5 text-xs ${deploying ? "text-yellow-400" : "text-green-400"}`}>
+                {deploying ? <RefreshCw size={12} className="animate-spin" /> : <CheckCircle size={12} />}
+                {deployMsg}
+              </span>
+            )}
+            <button onClick={() => { setShowAdd(true); setError(""); }} className="btn-primary">
+              <Plus size={15} /> Generate Key
+            </button>
+          </div>
         }
       />
 

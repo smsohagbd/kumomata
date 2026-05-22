@@ -50,6 +50,9 @@ export const updateSettings = (data: object) => api.post("/api/settings/", data)
 export const deployConfig = () => api.post("/api/deploy/config").then(d);
 export const getDeployStatus = () => api.get("/api/deploy/status").then(d);
 
+// --- Auto-deploy (silent background deploy after any config change) ---
+export const autoDeploy = () => api.post("/api/deploy/config").then(d).catch(() => null);
+
 // --- Logs ---
 export const getKumoLogs = (lines = 100) => api.get(`/api/logs/kumomta?lines=${lines}`).then(d);
 export const getBackendLogs = (lines = 100) => api.get(`/api/logs/backend?lines=${lines}`).then(d);
