@@ -116,8 +116,10 @@ fi
 
 # ── STEP 3: Create directories ──────────────────────────────
 info "Creating required directories..."
-mkdir -p "$POLICY_DIR" "$DKIM_DIR" /var/log/kumomta /var/spool/kumomta
-chown -R kumod:kumod /var/lib/kumomta /var/log/kumomta 2>/dev/null || true
+mkdir -p "$POLICY_DIR" "$DKIM_DIR"
+mkdir -p /var/log/kumomta
+mkdir -p /var/spool/kumomta/data /var/spool/kumomta/meta
+chown -R kumod:kumod /var/lib/kumomta /var/log/kumomta /var/spool/kumomta 2>/dev/null || true
 success "Directories ready"
 
 # ── STEP 4: Base KumoMTA config ─────────────────────────────
@@ -129,6 +131,10 @@ cat > "$POLICY_DIR/init.lua" << LUAEOF
 local kumo = require "kumo"
 
 kumo.on('init', function()
+  -- Spool storage (required)
+  kumo.define_spool { name = 'data', path = '/var/spool/kumomta/data' }
+  kumo.define_spool { name = 'meta', path = '/var/spool/kumomta/meta' }
+
   -- Accept SMTP relay from localhost only
   kumo.start_esmtp_listener {
     listen = '0.0.0.0:25',
@@ -139,10 +145,23 @@ kumo.on('init', function()
   kumo.start_http_listener {
     listen = '127.0.0.1:$KUMOMTA_API_PORT',
   }
+
+  -- Delivery logs (10s segments for near-realtime dashboard access)
+  kumo.configure_local_logs {
+    log_dir = '/var/log/kumomta',
+    max_segment_duration = '10 seconds',
+  }
+end)
+
+kumo.on('smtp_server_message_received', function(msg)
+  -- DKIM signing configured via dashboard Deploy
 end)
 
 kumo.on('get_queue_config', function(domain, tenant, campaign, routing_domain)
-  return kumo.make_queue_config {}
+  return kumo.make_queue_config {
+    max_age = '2 hours',
+    retry_interval = '30 minutes',
+  }
 end)
 
 kumo.on('get_egress_source', function(source_name)
@@ -189,6 +208,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 mkdir -p "$PANEL_DIR"
 cp -r "$PROJECT_DIR/." "$PANEL_DIR/"
+# Make update/start scripts executable
+chmod +x "$PANEL_DIR/scripts/update.sh" "$PANEL_DIR/scripts/start.sh" 2>/dev/null || true
+# Symlink update script for easy access
+ln -sf "$PANEL_DIR/scripts/update.sh" /usr/local/bin/kumomta-update
+ln -sf "$PANEL_DIR/scripts/start.sh" /usr/local/bin/kumomta-start
 cd "$PANEL_DIR"
 
 # ── STEP 7: Python backend ──────────────────────────────────

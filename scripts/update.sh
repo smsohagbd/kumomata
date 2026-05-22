@@ -15,7 +15,7 @@ err()  { echo -e "${RED}[!!]${NC}  $1"; exit 1; }
 
 PANEL_DIR="/opt/kumomta-panel"
 REPO_URL="https://github.com/smsohagbd/kumomata.git"
-TMP_DIR="/tmp/kumomata-update-$$"
+TMP_DIR="/opt/kumomata-update-tmp"
 
 [ "$EUID" -ne 0 ] && err "Run as root: sudo bash $0"
 
