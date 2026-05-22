@@ -134,7 +134,7 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
             "-- DKIM signing: sign outbound messages per sender domain",
             "-- -------------------------------------------------------",
             "kumo.on('smtp_server_message_received', function(msg)",
-            "  local from_domain = msg:from_header():domain()",
+            "  local from_domain = msg:sender().domain",
         ]
         for key in dkim_keys:
             key_path = f"{KUMOMTA_DKIM_DIR}/{key.domain}/{key.selector}.key"
@@ -163,20 +163,8 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
             "",
         ]
 
-    # -----------------------------------------------------------
-    # Egress path config: inline per-domain throttling
-    # -----------------------------------------------------------
-    lines += [
-        "-- -------------------------------------------------------",
-        "-- Egress path config: TLS + connection settings",
-        "-- -------------------------------------------------------",
-        "kumo.on('get_egress_path_config', function(domain, egress_source, site_name)",
-        "  return kumo.make_egress_path_config {",
-        "    enable_tls = 'OpportunisticInsecure',",
-        "  }",
-        "end)",
-        "",
-    ]
+    # kumo.make_egress_path_config does not exist in KumoMTA 2026.x
+    # omit the get_egress_path_config handler — KumoMTA uses built-in defaults
 
     return "\n".join(lines)
 
