@@ -50,7 +50,7 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
         "  -- Delivery logs (zstd-compressed JSONL in /var/log/kumomta/)",
         "  kumo.configure_local_logs {",
         "    log_dir = '/var/log/kumomta',",
-        "    max_segment_duration = '1 hour',",
+        "    max_segment_duration = '1 minute',",
         "  }",
         "end)",
         "",
