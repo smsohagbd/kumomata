@@ -103,7 +103,19 @@ def deploy_config(db: Session = Depends(get_db)):
         key_path = get_dkim_key_path(key.domain, key.selector)
         try:
             _write_file(key_path, key.private_key)
-            os.chmod(key_path, 0o600)  # private key: owner-read only
+            os.chmod(key_path, 0o640)
+            # KumoMTA runs as kumod — make sure it can read the key
+            try:
+                import pwd
+                kumod = pwd.getpwnam("kumod")
+                os.chown(key_path, kumod.pw_uid, kumod.pw_gid)
+                # Also fix parent dirs
+                domain_dir = os.path.dirname(key_path)
+                dkim_base = os.path.dirname(domain_dir)
+                for d in [dkim_base, domain_dir]:
+                    os.chown(d, kumod.pw_uid, kumod.pw_gid)
+            except KeyError:
+                pass  # kumod user not found (dev environment)
             dkim_written.append(f"{key.domain}/{key.selector}")
         except PermissionError:
             errors.append(f"Permission denied writing DKIM key for {key.domain}.")
