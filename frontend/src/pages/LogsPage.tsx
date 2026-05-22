@@ -176,7 +176,9 @@ function EmailLogs() {
                   <td className="font-mono text-xs text-gray-300 max-w-[140px] truncate">{r.recipient || "—"}</td>
                   <td className="text-xs text-gray-400 max-w-[220px]" title={r.response}>
                     <span className="truncate block">{r.response || "—"}</span>
-                    {r.bounce_class && <span className="text-orange-400 text-xs">({r.bounce_class})</span>}
+                    {r.bounce_class && r.bounce_class !== "Uncategorized" && (
+                      <span className="text-orange-400 text-xs">({r.bounce_class})</span>
+                    )}
                   </td>
                   <td className="text-xs text-gray-500">
                     <div>{r.peer_ip || "—"}</div>

@@ -98,8 +98,15 @@ def _parse_response(resp) -> dict:
     if isinstance(resp, dict):
         code = resp.get("code", 0)
         content = resp.get("content", "") or ""
-        enhanced = resp.get("enhanced_code") or ""
-        msg = f"{enhanced} {content}".strip() if enhanced else content
+        # enhanced_code is a dict like {"class":2,"subject":0,"detail":0} — format as "2.0.0"
+        enhanced = resp.get("enhanced_code")
+        if isinstance(enhanced, dict):
+            ec = f"{enhanced.get('class','')}.{enhanced.get('subject','')}.{enhanced.get('detail','')}"
+        elif enhanced:
+            ec = str(enhanced)
+        else:
+            ec = ""
+        msg = f"{ec} {content}".strip() if ec else content
         return {"code": code, "message": msg}
     return {"code": 0, "message": str(resp)}
 
