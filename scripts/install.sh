@@ -51,9 +51,24 @@ if command -v kumod &>/dev/null; then
 else
     info "Adding KumoMTA repository..."
     curl -1sLf 'https://repositories.kumomta.com/kumomta/setup.deb.sh' | bash
+
+    # Refresh package lists AFTER adding the new repo
+    info "Refreshing package lists..."
+    apt-get update -y -q
+
     info "Installing KumoMTA..."
-    apt-get install -y -q kumomta
-    success "KumoMTA installed"
+    if apt-get install -y kumomta; then
+        success "KumoMTA installed"
+    else
+        warn "apt package not found — trying direct .deb install from GitHub releases..."
+        KUMO_VERSION="2024.11.08-d383b033"
+        KUMO_DEB="kumomta_${KUMO_VERSION}_amd64.deb"
+        KUMO_URL="https://github.com/KumoCorp/kumomta/releases/download/${KUMO_VERSION}/${KUMO_DEB}"
+        info "Downloading $KUMO_DEB ..."
+        curl -fsSL -o "/tmp/${KUMO_DEB}" "$KUMO_URL" || error "Failed to download KumoMTA .deb. Check https://github.com/KumoCorp/kumomta/releases for the latest version."
+        apt-get install -y "/tmp/${KUMO_DEB}"
+        success "KumoMTA installed from .deb"
+    fi
 fi
 
 # ── STEP 3: Create directories ──────────────────────────────
