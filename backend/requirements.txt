@@ -9,3 +9,8 @@ cryptography==42.0.7
 python-multipart==0.0.9
 aiofiles==23.2.1
 zstandard>=0.22.0
+
+# Optional database drivers — install the one you need:
+# MySQL / MariaDB:   pip install pymysql
+# PostgreSQL:        pip install psycopg2-binary
+# pymysql and psycopg2-binary are not installed by default (SQLite needs no driver)

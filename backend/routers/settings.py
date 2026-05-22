@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from database import get_db
+from database import get_db, DATABASE_URL, DB_TYPE
 import models, schemas
 
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
@@ -53,3 +53,28 @@ def update_settings(payload: schemas.SettingsUpdate, db: Session = Depends(get_d
 def get_relay_hosts(db: Session = Depends(get_db)):
     raw = get_setting(db, "relay_hosts")
     return {"relay_hosts": [h.strip() for h in raw.split(",") if h.strip()]}
+
+
+@router.get("/database-info")
+def database_info():
+    """Return current database type and masked connection URL."""
+    # Mask password in URL for safe display
+    safe_url = DATABASE_URL
+    if "@" in DATABASE_URL:
+        # mysql+pymysql://user:PASS@host/db → mysql+pymysql://user:***@host/db
+        parts = DATABASE_URL.split("@")
+        creds = parts[0].split("://")[1] if "://" in parts[0] else parts[0]
+        if ":" in creds:
+            user = creds.split(":")[0]
+            protocol = parts[0].split("://")[0]
+            safe_url = f"{protocol}://{user}:***@{'@'.join(parts[1:])}"
+
+    return {
+        "db_type": DB_TYPE,
+        "url_display": safe_url,
+        "drivers": {
+            "sqlite": "built-in (no driver needed)",
+            "mysql": "pip install pymysql",
+            "postgresql": "pip install psycopg2-binary",
+        }
+    }

@@ -55,6 +55,9 @@ export const autoDeploy = () => api.post("/api/deploy/config").then(d).catch(() 
 export const testSmtp = () => api.post("/api/deploy/test-smtp").then(d);
 export const clearQueue = () => api.post("/api/deploy/clear-queue").then(d);
 
+// --- DB Info ---
+export const getDatabaseInfo = () => api.get("/api/settings/database-info").then(d);
+
 // --- Suppressions ---
 export const getSuppressions = () => api.get("/api/suppressions").then(d);
 export const addSuppression = (email: string, reason?: string) => api.post("/api/suppressions", { email, reason }).then(d);

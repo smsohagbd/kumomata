@@ -226,10 +226,12 @@ WorkingDirectory=$PANEL_DIR/backend
 ExecStart=$PANEL_DIR/backend/venv/bin/uvicorn main:app --host 0.0.0.0 --port $BACKEND_PORT
 Restart=always
 RestartSec=5
-Environment=DB_PATH=$PANEL_DIR/kumomta_panel.db
+Environment=DATABASE_URL=sqlite:///$PANEL_DIR/kumomta_panel.db
 Environment=KUMOMTA_API=http://127.0.0.1:$KUMOMTA_API_PORT
 Environment=KUMOMTA_POLICY_DIR=$POLICY_DIR
 Environment=KUMOMTA_DKIM_DIR=$DKIM_DIR
+# To use MySQL: set DATABASE_URL=mysql+pymysql://user:pass@localhost:3306/kumomta_panel
+# Then: pip install pymysql && systemctl restart kumomta-panel-backend
 
 [Install]
 WantedBy=multi-user.target

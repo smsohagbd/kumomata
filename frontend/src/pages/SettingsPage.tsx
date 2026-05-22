@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Save, Settings } from "lucide-react";
+import { Save, Settings, Database } from "lucide-react";
 import PageHeader from "../components/PageHeader";
-import { getSettings, updateSettings } from "../api/client";
+import { getSettings, updateSettings, getDatabaseInfo } from "../api/client";
 
 interface SettingsData {
   kumomta_host: string;
@@ -22,12 +22,15 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [dbInfo, setDbInfo] = useState<any>(null);
 
   useEffect(() => {
     getSettings()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data: any) => setForm(data))
       .finally(() => setLoading(false));
+    getDatabaseInfo().then(setDbInfo).catch(() => {});
   }, []);
 
   const handleSave = async () => {
@@ -157,6 +160,53 @@ export default function SettingsPage() {
               </p>
             )}
           </div>
+        </div>
+
+        {/* Database Info */}
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <Database size={16} className="text-purple-400" />
+            <h2 className="font-semibold text-white">Database</h2>
+            {dbInfo && (
+              <span className={`ml-auto text-xs px-2 py-0.5 rounded-full font-medium ${
+                dbInfo.db_type === "sqlite" ? "bg-gray-700 text-gray-300" :
+                dbInfo.db_type === "mysql" ? "bg-orange-900/30 text-orange-400" :
+                "bg-blue-900/30 text-blue-400"
+              }`}>
+                {dbInfo.db_type?.toUpperCase()}
+              </span>
+            )}
+          </div>
+          {dbInfo ? (
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="label">Current Connection</p>
+                <code className="block font-mono text-xs text-green-400 bg-gray-800 rounded-lg px-3 py-2 mt-1 break-all">
+                  {dbInfo.url_display}
+                </code>
+              </div>
+              <p className="text-gray-500 text-xs">
+                To switch databases, set the <code className="text-gray-300">DATABASE_URL</code> environment
+                variable in the systemd service and restart the backend.
+              </p>
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-400">Switch to another database:</p>
+                <div className="space-y-1.5 font-mono text-xs bg-gray-900 rounded-lg p-3">
+                  <p className="text-gray-500"># MySQL / MariaDB</p>
+                  <p className="text-green-400">DATABASE_URL=mysql+pymysql://user:pass@localhost:3306/kumomta</p>
+                  <p className="text-gray-600">pip install pymysql</p>
+                  <p className="text-gray-500 mt-2"># PostgreSQL</p>
+                  <p className="text-green-400">DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/kumomta</p>
+                  <p className="text-gray-600">pip install psycopg2-binary</p>
+                  <p className="text-gray-500 mt-2"># Edit service and restart</p>
+                  <p className="text-blue-400">systemctl edit kumomta-panel-backend</p>
+                  <p className="text-blue-400">systemctl restart kumomta-panel-backend</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Could not load database info.</p>
+          )}
         </div>
 
         {/* Install guide */}
