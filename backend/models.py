@@ -68,6 +68,29 @@ class DKIMKey(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class EmailLog(Base):
+    """Realtime delivery log events pushed by KumoMTA via webhook."""
+    __tablename__ = "email_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    event_type = Column(String, nullable=False, index=True)   # Reception, Delivery, Bounce, etc.
+    message_id = Column(String, nullable=True, index=True)
+    sender = Column(String, nullable=True)
+    recipient = Column(String, nullable=True)
+    queue = Column(String, nullable=True)
+    site = Column(String, nullable=True)
+    response_code = Column(Integer, nullable=True)
+    response_message = Column(String, nullable=True)
+    peer_ip = Column(String, nullable=True)
+    egress_pool = Column(String, nullable=True)
+    egress_source = Column(String, nullable=True)
+    size = Column(Integer, nullable=True)
+    num_attempts = Column(Integer, nullable=True)
+    bounce_class = Column(String, nullable=True)
+    event_time = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class AppSettings(Base):
     __tablename__ = "app_settings"
 

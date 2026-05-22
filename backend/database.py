@@ -31,6 +31,27 @@ def _migrate():
     with engine.connect() as conn:
         migrations = [
             "ALTER TABLE ip_addresses ADD COLUMN hostname VARCHAR",
+            """CREATE TABLE IF NOT EXISTS email_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type VARCHAR NOT NULL,
+                message_id VARCHAR,
+                sender VARCHAR,
+                recipient VARCHAR,
+                queue VARCHAR,
+                site VARCHAR,
+                response_code INTEGER,
+                response_message VARCHAR,
+                peer_ip VARCHAR,
+                egress_pool VARCHAR,
+                egress_source VARCHAR,
+                size INTEGER,
+                num_attempts INTEGER,
+                bounce_class VARCHAR,
+                event_time VARCHAR,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_email_logs_event_type ON email_logs (event_type)",
+            "CREATE INDEX IF NOT EXISTS ix_email_logs_created_at ON email_logs (created_at)",
         ]
         for sql in migrations:
             try:

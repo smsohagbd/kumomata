@@ -3,7 +3,10 @@ import os
 import json
 import glob
 from datetime import datetime
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request, Depends
+from sqlalchemy.orm import Session
+from database import get_db
+import models
 
 try:
     import zstandard as zstd
@@ -191,4 +194,93 @@ def email_logs(lines: int = Query(default=200, le=1000)):
     except Exception as e:
         return {"records": [], "error": str(e)}
 
+    return {"records": records, "total": len(records)}
+
+
+# ─── Webhook receiver (KumoMTA pushes events here in realtime) ────────────────
+
+@router.post("/webhook")
+async def receive_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    KumoMTA calls this endpoint for every log event via configure_log_hook.
+    Stores events in the email_logs table for instant frontend display.
+    """
+    try:
+        body = await request.body()
+        # KumoMTA sends one JSON object per line (batch of events)
+        saved = 0
+        for line in body.decode("utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            resp = _parse_response(rec.get("response"))
+            peer = rec.get("peer_address") or {}
+            peer_ip = peer.get("addr", "") if isinstance(peer, dict) else str(peer)
+            bounce = rec.get("bounce_classification") or ""
+            if isinstance(bounce, dict):
+                bounce = bounce.get("name", "") or bounce.get("category", "") or str(bounce)
+
+            entry = models.EmailLog(
+                event_type=rec.get("type", "Unknown"),
+                message_id=rec.get("id", ""),
+                sender=rec.get("sender", ""),
+                recipient=rec.get("recipient", ""),
+                queue=rec.get("queue", ""),
+                site=rec.get("site", ""),
+                response_code=resp["code"],
+                response_message=resp["message"],
+                peer_ip=peer_ip,
+                egress_pool=rec.get("egress_pool") or "",
+                egress_source=rec.get("egress_source") or "",
+                size=rec.get("size") or 0,
+                num_attempts=rec.get("num_attempts") or 0,
+                bounce_class=bounce if bounce not in ("Uncategorized", "") else "",
+                event_time=_parse_ts(rec.get("timestamp")),
+            )
+            db.add(entry)
+            saved += 1
+
+        db.commit()
+        return {"ok": True, "saved": saved}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@router.get("/email/realtime")
+def email_logs_realtime(
+    limit: int = Query(default=200, le=1000),
+    db: Session = Depends(get_db),
+):
+    """Return email log events from DB (populated in realtime via webhook)."""
+    rows = (
+        db.query(models.EmailLog)
+        .order_by(models.EmailLog.id.desc())
+        .limit(limit)
+        .all()
+    )
+    records = [
+        {
+            "type":         r.event_type,
+            "timestamp":    r.event_time or "",
+            "sender":       r.sender or "",
+            "recipient":    r.recipient or "",
+            "queue":        r.queue or "",
+            "site":         r.site or "",
+            "code":         r.response_code or 0,
+            "response":     r.response_message or "",
+            "size":         r.size or 0,
+            "num_attempts": r.num_attempts or 0,
+            "peer_ip":      r.peer_ip or "",
+            "egress_pool":  r.egress_pool or "",
+            "egress_source":r.egress_source or "",
+            "bounce_class": r.bounce_class or "",
+            "id":           r.message_id or "",
+        }
+        for r in rows
+    ]
     return {"records": records, "total": len(records)}

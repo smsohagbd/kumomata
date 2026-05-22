@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { RefreshCw, Terminal, Mail, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 import PageHeader from "../components/PageHeader";
-import { getKumoLogs, getBackendLogs, getEmailLogs } from "../api/client";
+import { getKumoLogs, getBackendLogs, getEmailLogs, getEmailLogsRealtime } from "../api/client";
 
 // ─── Types ────────────────────────────────────────────────
 type LogLevel = "info" | "warn" | "error" | "debug";
@@ -60,16 +60,26 @@ function EmailLogs() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [lines, setLines] = useState(200);
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [source, setSource] = useState<"realtime" | "files">("realtime");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = async () => {
     setLoading(true);
     try {
+      // Try realtime DB first (webhook-populated), fall back to file reader
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await getEmailLogs(lines);
-      setRecords(data.records || []);
-      setError(data.error || "");
+      let data: any = await getEmailLogsRealtime(lines);
+      if (data.records && data.records.length > 0) {
+        setSource("realtime");
+        setRecords(data.records);
+        setError("");
+      } else {
+        data = await getEmailLogs(lines);
+        setSource("files");
+        setRecords(data.records || []);
+        setError(data.error || "");
+      }
     } catch {
       setError("Failed to load email logs");
     } finally {
@@ -81,7 +91,7 @@ function EmailLogs() {
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    if (autoRefresh) intervalRef.current = setInterval(load, 5000);
+    if (autoRefresh) intervalRef.current = setInterval(load, 10000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [autoRefresh, lines]);
 
@@ -138,7 +148,7 @@ function EmailLogs() {
         <div className="card text-center py-12">
           <Mail size={32} className="mx-auto text-gray-600 mb-3" />
           <p className="text-gray-400 font-medium">No email logs yet</p>
-          <p className="text-sm text-gray-600 mt-1">Logs appear here after emails are sent through KumoMTA</p>
+          <p className="text-sm text-gray-600 mt-1">Send an email — logs appear within ~10 seconds. Auto-refresh is ON.</p>
         </div>
       )}
 
