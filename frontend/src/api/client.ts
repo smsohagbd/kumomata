@@ -54,3 +54,4 @@ export const getDeployStatus = () => api.get("/api/deploy/status").then(d);
 export const getKumoLogs = (lines = 100) => api.get(`/api/logs/kumomta?lines=${lines}`).then(d);
 export const getBackendLogs = (lines = 100) => api.get(`/api/logs/backend?lines=${lines}`).then(d);
 export const getFrontendLogs = (lines = 50) => api.get(`/api/logs/frontend?lines=${lines}`).then(d);
+export const getEmailLogs = (lines = 200) => api.get(`/api/logs/email?lines=${lines}`).then(d);

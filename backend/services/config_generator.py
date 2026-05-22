@@ -46,6 +46,12 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
         "  kumo.start_http_listener {",
         "    listen = '127.0.0.1:8001',",
         "  }",
+        "",
+        "  -- Delivery logs (JSON per line in /var/log/kumomta/)",
+        "  kumo.configure_local_logs {",
+        "    log_dir = '/var/log/kumomta',",
+        "    max_segment_duration = '1 hour',",
+        "  }",
         "end)",
         "",
     ]
