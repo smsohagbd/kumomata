@@ -23,16 +23,25 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
         'local kumo = require "kumo"',
         "",
         "-- -------------------------------------------------------",
-        "-- Startup: listeners",
+        "-- Startup: spool + listeners",
         "-- -------------------------------------------------------",
         "kumo.on('init', function()",
-        "  -- Accept inbound SMTP from localhost only (relay mode)",
+        "  -- Spool storage (required by KumoMTA)",
+        "  kumo.define_spool {",
+        "    name = 'data',",
+        "    path = '/var/spool/kumomta/data',",
+        "  }",
+        "  kumo.define_spool {",
+        "    name = 'meta',",
+        "    path = '/var/spool/kumomta/meta',",
+        "  }",
+        "",
+        "  -- Accept inbound SMTP relay from localhost only",
         "  kumo.start_esmtp_listener {",
         "    listen = '0.0.0.0:25',",
         "    relay_hosts = { '127.0.0.1', '::1' },",
         "  }",
         "",
-        "  -- HTTP management API (localhost only for security)",
         "  -- HTTP management API (localhost only — accessed by the panel)",
         "  kumo.start_http_listener {",
         "    listen = '127.0.0.1:8001',",
@@ -101,18 +110,17 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
     ]
 
     # -----------------------------------------------------------
-    # Queue config: use traffic shaping + assign pool
+    # Queue config: assign egress pool
     # -----------------------------------------------------------
     default_pool = list(pools.keys())[0] if pools else "default"
     lines += [
         "-- -------------------------------------------------------",
-        "-- Queue config: assign egress pool and load shaping rules",
+        "-- Queue config: assign egress pool",
         "-- -------------------------------------------------------",
         "kumo.on('get_queue_config', function(domain, tenant, campaign, routing_domain)",
-        "  local shaping = require 'policy-extras.shaping'",
-        f"  local params = shaping:get_queue_config(domain, tenant, campaign)",
-        f"  params.egress_pool = '{default_pool}'",
-        "  return kumo.make_queue_config(params)",
+        f"  return kumo.make_queue_config {{",
+        f"    egress_pool = '{default_pool}',",
+        "  }",
         "end)",
         "",
     ]
@@ -145,15 +153,16 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
         lines += ["end)", ""]
 
     # -----------------------------------------------------------
-    # Shaping rules from shaping.toml
+    # Egress path config: inline per-domain throttling
     # -----------------------------------------------------------
     lines += [
         "-- -------------------------------------------------------",
-        "-- Traffic shaping: load rules from shaping.toml",
+        "-- Egress path config: TLS + connection settings",
         "-- -------------------------------------------------------",
         "kumo.on('get_egress_path_config', function(domain, egress_source, site_name)",
-        "  local shaping = require 'policy-extras.shaping'",
-        "  return shaping:get_egress_path_config(domain, egress_source, site_name)",
+        "  return kumo.make_egress_path_config {",
+        "    enable_tls = 'OpportunisticInsecure',",
+        "  }",
         "end)",
         "",
     ]
