@@ -1,0 +1,25 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Layout from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+import IPManager from "./pages/IPManager";
+import DomainRules from "./pages/DomainRules";
+import DKIMPage from "./pages/DKIMPage";
+import ConfigPreview from "./pages/ConfigPreview";
+import SettingsPage from "./pages/SettingsPage";
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/ips" element={<IPManager />} />
+          <Route path="/domains" element={<DomainRules />} />
+          <Route path="/dkim" element={<DKIMPage />} />
+          <Route path="/config" element={<ConfigPreview />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
