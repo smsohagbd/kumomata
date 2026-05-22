@@ -257,6 +257,7 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
+systemctl enable --now kumomta
 systemctl enable --now kumomta-panel-backend
 systemctl enable --now kumomta-panel-frontend
 
