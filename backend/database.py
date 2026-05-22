@@ -77,6 +77,7 @@ def _get_migrations() -> list[str]:
     return [
         # New columns on existing tables
         "ALTER TABLE ip_addresses ADD COLUMN hostname VARCHAR(255)",
+        "ALTER TABLE domain_rules ADD COLUMN egress_pool VARCHAR(128)",
 
         # email_logs table
         f"""CREATE TABLE IF NOT EXISTS email_logs (

@@ -82,7 +82,7 @@ def deploy_config(db: Session = Depends(get_db)):
     # Write init.lua
     init_lua_path = os.path.join(POLICY_DIR, "init.lua")
     try:
-        _write_file(init_lua_path, generate_init_lua(ips, dkim_keys, relay_hosts))
+        _write_file(init_lua_path, generate_init_lua(ips, dkim_keys, relay_hosts, domain_rules))
     except PermissionError:
         errors.append(f"Permission denied writing {init_lua_path}. Run the panel as root or grant write access.")
     except Exception as e:

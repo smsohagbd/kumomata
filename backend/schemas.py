@@ -46,6 +46,7 @@ class DomainRuleCreate(BaseModel):
     max_per_hour: int = 200
     max_per_day: int = 2000
     max_connections: int = 10
+    egress_pool: Optional[str] = None
     notes: Optional[str] = None
     is_active: bool = True
 
@@ -63,6 +64,7 @@ class DomainRuleUpdate(BaseModel):
     max_per_hour: Optional[int] = None
     max_per_day: Optional[int] = None
     max_connections: Optional[int] = None
+    egress_pool: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -74,6 +76,7 @@ class DomainRuleOut(BaseModel):
     max_per_hour: int
     max_per_day: int
     max_connections: int
+    egress_pool: Optional[str]
     notes: Optional[str]
     is_active: bool
     created_at: Optional[datetime]

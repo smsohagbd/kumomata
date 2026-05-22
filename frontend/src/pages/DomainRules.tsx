@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Globe, Zap, RefreshCw, CheckCircle } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Modal from "../components/Modal";
-import { getDomains, createDomain, updateDomain, deleteDomain, createFromPreset, getPresets, autoDeploy } from "../api/client";
+import { getDomains, createDomain, updateDomain, deleteDomain, createFromPreset, getPresets, autoDeploy, getIPs } from "../api/client";
 
 interface DomainRule {
   id: number;
@@ -11,6 +11,7 @@ interface DomainRule {
   max_per_hour: number;
   max_per_day: number;
   max_connections: number;
+  egress_pool: string | null;
   notes: string | null;
   is_active: boolean;
   created_at: string;
@@ -24,6 +25,7 @@ const emptyForm = {
   max_per_hour: 200,
   max_per_day: 2000,
   max_connections: 10,
+  egress_pool: "",
   notes: "",
   is_active: true,
 };
@@ -39,6 +41,7 @@ const DOMAIN_ICONS: Record<string, string> = {
 export default function DomainRules() {
   const [rules, setRules] = useState<DomainRule[]>([]);
   const [presets, setPresets] = useState<Presets>({});
+  const [pools, setPools] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<DomainRule | null>(null);
@@ -52,9 +55,12 @@ export default function DomainRules() {
   const load = async () => {
     setLoading(true);
     try {
-      const [r, p] = await Promise.all([getDomains(), getPresets()]);
+      const [r, p, ips] = await Promise.all([getDomains(), getPresets(), getIPs()]);
       setRules(r);
       setPresets(p);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const uniquePools = [...new Set((ips as any[]).map((ip: any) => ip.pool_name))] as string[];
+      setPools(uniquePools);
     } finally {
       setLoading(false);
     }
@@ -70,6 +76,7 @@ export default function DomainRules() {
       max_per_hour: rule.max_per_hour,
       max_per_day: rule.max_per_day,
       max_connections: rule.max_connections,
+      egress_pool: rule.egress_pool || "",
       notes: rule.notes || "",
       is_active: rule.is_active,
     });
@@ -189,6 +196,7 @@ export default function DomainRules() {
               <thead>
                 <tr>
                   <th>Domain</th>
+                  <th>IP Pool</th>
                   <th>Per Minute</th>
                   <th>Per Hour</th>
                   <th>Per Day</th>
@@ -204,6 +212,13 @@ export default function DomainRules() {
                       <span className="font-medium text-white">
                         {DOMAIN_ICONS[rule.domain] || "🌐"} {rule.domain}
                       </span>
+                    </td>
+                    <td>
+                      {rule.egress_pool ? (
+                        <span className="badge-blue text-xs">{rule.egress_pool}</span>
+                      ) : (
+                        <span className="text-xs text-gray-500">default</span>
+                      )}
                     </td>
                     <td>
                       <RateCell value={rule.max_per_minute} label="msg/min" />
@@ -279,6 +294,22 @@ export default function DomainRules() {
               value={form.max_connections}
               onChange={(v) => setForm({ ...form, max_connections: v })}
             />
+          </div>
+          <div>
+            <label className="label">IP Pool <span className="text-gray-500 font-normal text-xs ml-1">(which IPs to use for this domain)</span></label>
+            <select
+              className="input"
+              value={form.egress_pool}
+              onChange={(e) => setForm({ ...form, egress_pool: e.target.value })}
+            >
+              <option value="">Default pool (round-robin all IPs)</option>
+              {pools.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-600 mt-1">
+              Select a specific pool to route this domain's emails through dedicated IPs.
+            </p>
           </div>
           <div>
             <label className="label">Notes (optional)</label>

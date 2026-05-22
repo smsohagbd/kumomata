@@ -29,6 +29,7 @@ class DomainRule(Base):
     max_per_day = Column(Integer, default=2000)
     max_connections = Column(Integer, default=10)
     max_message_rate = Column(String, default="10/min")
+    egress_pool = Column(String, nullable=True)   # None = use default pool
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

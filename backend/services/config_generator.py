@@ -11,7 +11,9 @@ def _ip_name(ip: models.IPAddress) -> str:
     return (ip.label or ip.ip).replace(".", "_").replace("-", "_").replace(" ", "_")
 
 
-def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKey], relay_hosts: str = "127.0.0.1,::1") -> str:
+def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKey], relay_hosts: str = "127.0.0.1,::1", domain_rules: List[models.DomainRule] = None) -> str:
+    if domain_rules is None:
+        domain_rules = []
     pools: dict[str, List[models.IPAddress]] = {}
     for ip in ips:
         pools.setdefault(ip.pool_name, []).append(ip)
@@ -119,19 +121,32 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
     ]
 
     # -----------------------------------------------------------
-    # Queue config: assign egress pool
+    # Queue config: per-domain pool routing + retry limits
     # -----------------------------------------------------------
     default_pool = list(pools.keys())[0] if pools else "default"
+    routed = [r for r in domain_rules if getattr(r, "egress_pool", None)]
+
     lines += [
         "-- -------------------------------------------------------",
-        "-- Queue config: assign egress pool and retry limits",
+        "-- Queue config: per-domain pool routing + retry limits",
         "-- -------------------------------------------------------",
         "kumo.on('get_queue_config', function(domain, tenant, campaign, routing_domain)",
-        f"  return kumo.make_queue_config {{",
+    ]
+    for rule in routed:
+        lines += [
+            f"  if domain == '{rule.domain}' then",
+            "    return kumo.make_queue_config {",
+            f"      egress_pool = '{rule.egress_pool}',",
+            "      max_age = '2 hours',",
+            "      retry_interval = '30 minutes',",
+            "    }",
+            "  end",
+        ]
+    lines += [
+        "  -- Default pool for all other domains",
+        "  return kumo.make_queue_config {",
         f"    egress_pool = '{default_pool}',",
-        "    -- Retry for up to 2 hours, then give up (prevents endless retry loops)",
         "    max_age = '2 hours',",
-        "    -- Wait 30 minutes between retries (max ~3 attempts total)",
         "    retry_interval = '30 minutes',",
         "  }",
         "end)",
