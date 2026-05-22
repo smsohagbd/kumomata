@@ -68,14 +68,17 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
     if ips:
         for ip in ips:
             name = _ip_name(ip)
-            lines += [
+            ehlo_line = f"      ehlo_domain = '{ip.hostname}'," if ip.hostname else ""
+            block = [
                 f"  if source_name == '{name}' then",
                 "    return kumo.make_egress_source {",
                 f"      name = '{name}',",
                 f"      source_address = '{ip.ip}',",
-                "    }",
-                "  end",
             ]
+            if ehlo_line:
+                block.append(ehlo_line)
+            block += ["    }", "  end"]
+            lines += block
     lines += [
         "  -- Fallback: let the OS choose the source address",
         "  return kumo.make_egress_source { name = source_name }",

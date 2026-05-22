@@ -10,6 +10,7 @@ class IPAddress(Base):
     id = Column(Integer, primary_key=True, index=True)
     ip = Column(String, unique=True, nullable=False, index=True)
     label = Column(String, nullable=True)
+    hostname = Column(String, nullable=True)
     pool_name = Column(String, default="default", nullable=False)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

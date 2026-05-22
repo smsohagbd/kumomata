@@ -22,3 +22,19 @@ def get_db():
 def init_db():
     from models import Base as ModelsBase
     ModelsBase.metadata.create_all(bind=engine)
+    _migrate()
+
+
+def _migrate():
+    """Add new columns to existing tables without losing data."""
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        migrations = [
+            "ALTER TABLE ip_addresses ADD COLUMN hostname VARCHAR",
+        ]
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists

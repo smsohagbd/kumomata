@@ -7,6 +7,7 @@ import ipaddress
 class IPAddressCreate(BaseModel):
     ip: str
     label: Optional[str] = None
+    hostname: Optional[str] = None
     pool_name: str = "default"
     is_active: bool = True
 
@@ -22,6 +23,7 @@ class IPAddressCreate(BaseModel):
 
 class IPAddressUpdate(BaseModel):
     label: Optional[str] = None
+    hostname: Optional[str] = None
     pool_name: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -30,6 +32,7 @@ class IPAddressOut(BaseModel):
     id: int
     ip: str
     label: Optional[str]
+    hostname: Optional[str]
     pool_name: str
     is_active: bool
     created_at: Optional[datetime]

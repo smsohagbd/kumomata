@@ -8,12 +8,13 @@ interface IP {
   id: number;
   ip: string;
   label: string | null;
+  hostname: string | null;
   pool_name: string;
   is_active: boolean;
   created_at: string;
 }
 
-const empty = { ip: "", label: "", pool_name: "default", is_active: true };
+const empty = { ip: "", label: "", hostname: "", pool_name: "default", is_active: true };
 
 export default function IPManager() {
   const [ips, setIPs] = useState<IP[]>([]);
@@ -45,7 +46,7 @@ export default function IPManager() {
 
   const openAdd = () => { setForm({ ...empty }); setEditing(null); setError(""); setShowAdd(true); };
   const openEdit = (ip: IP) => {
-    setForm({ ip: ip.ip, label: ip.label || "", pool_name: ip.pool_name, is_active: ip.is_active });
+    setForm({ ip: ip.ip, label: ip.label || "", hostname: ip.hostname || "", pool_name: ip.pool_name, is_active: ip.is_active });
     setEditing(ip);
     setError("");
     setShowAdd(true);
@@ -56,7 +57,7 @@ export default function IPManager() {
     setError("");
     try {
       if (editing) {
-        await updateIP(editing.id, { label: form.label, pool_name: form.pool_name, is_active: form.is_active });
+        await updateIP(editing.id, { label: form.label, hostname: form.hostname, pool_name: form.pool_name, is_active: form.is_active });
       } else {
         await createIP(form);
       }
@@ -138,10 +139,10 @@ export default function IPManager() {
               <thead>
                 <tr>
                   <th>IP Address</th>
+                  <th>Hostname (EHLO)</th>
                   <th>Label</th>
                   <th>Pool</th>
                   <th>Status</th>
-                  <th>Added</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -149,6 +150,7 @@ export default function IPManager() {
                 {ips.map((ip) => (
                   <tr key={ip.id}>
                     <td className="font-mono text-blue-400">{ip.ip}</td>
+                    <td className="font-mono text-xs text-purple-300">{ip.hostname || <span className="text-red-400 text-xs">⚠ not set</span>}</td>
                     <td className="text-gray-400">{ip.label || "—"}</td>
                     <td>
                       <span className="badge-blue">{ip.pool_name}</span>
@@ -159,9 +161,6 @@ export default function IPManager() {
                       ) : (
                         <span className="badge-red">Disabled</span>
                       )}
-                    </td>
-                    <td className="text-gray-500 text-xs">
-                      {new Date(ip.created_at).toLocaleDateString()}
                     </td>
                     <td>
                       <div className="flex items-center gap-1">
@@ -201,6 +200,16 @@ export default function IPManager() {
               onChange={(e) => setForm({ ...form, ip: e.target.value })}
               disabled={!!editing}
             />
+          </div>
+          <div>
+            <label className="label">Hostname <span className="text-red-400 text-xs ml-1">required for EHLO</span></label>
+            <input
+              className="input"
+              placeholder="e.g. mail.yourdomain.com"
+              value={form.hostname}
+              onChange={(e) => setForm({ ...form, hostname: e.target.value })}
+            />
+            <p className="text-xs text-gray-600 mt-1">Must match the PTR/reverse DNS record of this IP. Used in EHLO during sending.</p>
           </div>
           <div>
             <label className="label">Label (optional)</label>
