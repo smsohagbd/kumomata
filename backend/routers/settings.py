@@ -10,6 +10,8 @@ DEFAULTS = {
     "kumomta_port": "25",
     "kumomta_api_port": "8001",
     "config_dir": "/opt/kumomta/etc/policy",
+    # Comma-separated list of allowed relay IPs/CIDRs, or "0.0.0.0/0" for anywhere
+    "relay_hosts": "127.0.0.1,::1",
 }
 
 
@@ -28,14 +30,15 @@ def set_setting(db: Session, key: str, value: str):
     db.commit()
 
 
-@router.get("/", response_model=schemas.SettingsOut)
+@router.get("/")
 def get_settings(db: Session = Depends(get_db)):
-    return schemas.SettingsOut(
-        kumomta_host=get_setting(db, "kumomta_host"),
-        kumomta_port=int(get_setting(db, "kumomta_port") or 25),
-        kumomta_api_port=int(get_setting(db, "kumomta_api_port") or 8000),
-        config_dir=get_setting(db, "config_dir"),
-    )
+    return {
+        "kumomta_host": get_setting(db, "kumomta_host"),
+        "kumomta_port": int(get_setting(db, "kumomta_port") or 25),
+        "kumomta_api_port": int(get_setting(db, "kumomta_api_port") or 8001),
+        "config_dir": get_setting(db, "config_dir"),
+        "relay_hosts": get_setting(db, "relay_hosts"),
+    }
 
 
 @router.post("/")
@@ -44,3 +47,9 @@ def update_settings(payload: schemas.SettingsUpdate, db: Session = Depends(get_d
     for key, value in data.items():
         set_setting(db, key, str(value))
     return {"ok": True}
+
+
+@router.get("/relay-hosts")
+def get_relay_hosts(db: Session = Depends(get_db)):
+    raw = get_setting(db, "relay_hosts")
+    return {"relay_hosts": [h.strip() for h in raw.split(",") if h.strip()]}

@@ -11,7 +11,7 @@ def _ip_name(ip: models.IPAddress) -> str:
     return (ip.label or ip.ip).replace(".", "_").replace("-", "_").replace(" ", "_")
 
 
-def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKey]) -> str:
+def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKey], relay_hosts: str = "127.0.0.1,::1") -> str:
     pools: dict[str, List[models.IPAddress]] = {}
     for ip in ips:
         pools.setdefault(ip.pool_name, []).append(ip)
@@ -36,10 +36,10 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
         "    path = '/var/spool/kumomta/meta',",
         "  }",
         "",
-        "  -- Accept inbound SMTP relay from localhost only",
+        "  -- Accept inbound SMTP relay",
         "  kumo.start_esmtp_listener {",
         "    listen = '0.0.0.0:25',",
-        "    relay_hosts = { '127.0.0.1', '::1' },",
+        "    relay_hosts = { " + ", ".join(f"'{h.strip()}'" for h in relay_hosts.split(",") if h.strip()) + " },",
         "  }",
         "",
         "  -- HTTP management API (localhost only — accessed by the panel)",

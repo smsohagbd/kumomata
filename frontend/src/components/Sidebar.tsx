@@ -7,6 +7,7 @@ import {
   FileCode,
   Settings,
   Mail,
+  ScrollText,
 } from "lucide-react";
 
 const nav = [
@@ -14,7 +15,8 @@ const nav = [
   { to: "/ips", label: "IP Addresses", icon: Server },
   { to: "/domains", label: "Domain Rules", icon: Globe },
   { to: "/dkim", label: "DKIM Keys", icon: ShieldCheck },
-  { to: "/config", label: "Config Preview", icon: FileCode },
+  { to: "/config", label: "Config & Deploy", icon: FileCode },
+  { to: "/logs", label: "Logs", icon: ScrollText },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 from services.config_generator import generate_init_lua, generate_shaping_toml, get_dkim_key_path
+from routers.settings import get_setting
 
 router = APIRouter(prefix="/api/deploy", tags=["Deploy"])
 
@@ -74,13 +75,14 @@ def deploy_config(db: Session = Depends(get_db)):
     ips = db.query(models.IPAddress).filter(models.IPAddress.is_active == True).all()
     dkim_keys = db.query(models.DKIMKey).filter(models.DKIMKey.is_active == True).all()
     domain_rules = db.query(models.DomainRule).filter(models.DomainRule.is_active == True).all()
+    relay_hosts = get_setting(db, "relay_hosts") or "127.0.0.1,::1"
 
     errors = []
 
     # Write init.lua
     init_lua_path = os.path.join(POLICY_DIR, "init.lua")
     try:
-        _write_file(init_lua_path, generate_init_lua(ips, dkim_keys))
+        _write_file(init_lua_path, generate_init_lua(ips, dkim_keys, relay_hosts))
     except PermissionError:
         errors.append(f"Permission denied writing {init_lua_path}. Run the panel as root or grant write access.")
     except Exception as e:

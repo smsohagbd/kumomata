@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import os
 
 from database import init_db
-from routers import ips, domains, dkim, config, stats, settings, deploy
+from routers import ips, domains, dkim, config, stats, settings, deploy, logs
 
 
 @asynccontextmanager
@@ -37,6 +37,7 @@ app.include_router(config.router)
 app.include_router(stats.router)
 app.include_router(settings.router)
 app.include_router(deploy.router)
+app.include_router(logs.router)
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 

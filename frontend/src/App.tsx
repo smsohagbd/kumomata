@@ -6,6 +6,7 @@ import DomainRules from "./pages/DomainRules";
 import DKIMPage from "./pages/DKIMPage";
 import ConfigPreview from "./pages/ConfigPreview";
 import SettingsPage from "./pages/SettingsPage";
+import LogsPage from "./pages/LogsPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="/domains" element={<DomainRules />} />
           <Route path="/dkim" element={<DKIMPage />} />
           <Route path="/config" element={<ConfigPreview />} />
+          <Route path="/logs" element={<LogsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>

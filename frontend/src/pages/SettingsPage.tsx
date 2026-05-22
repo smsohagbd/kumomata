@@ -8,6 +8,7 @@ interface SettingsData {
   kumomta_port: number;
   kumomta_api_port: number;
   config_dir: string;
+  relay_hosts: string;
 }
 
 export default function SettingsPage() {
@@ -16,6 +17,7 @@ export default function SettingsPage() {
     kumomta_port: 25,
     kumomta_api_port: 8001,
     config_dir: "/opt/kumomta/etc/policy",
+    relay_hosts: "127.0.0.1,::1",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,6 +122,40 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-600 mt-1">
               Path on the server where KumoMTA policy Lua files are stored
             </p>
+          </div>
+
+          <div>
+            <label className="label">SMTP Relay Hosts</label>
+            <input
+              className="input font-mono text-sm"
+              value={form.relay_hosts}
+              onChange={(e) => set("relay_hosts", e.target.value)}
+              placeholder="127.0.0.1,::1"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Comma-separated IPs allowed to relay through KumoMTA.
+            </p>
+            <div className="flex flex-wrap gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => set("relay_hosts", "127.0.0.1,::1")}
+                className="btn-secondary text-xs py-1"
+              >
+                Localhost only
+              </button>
+              <button
+                type="button"
+                onClick={() => set("relay_hosts", "0.0.0.0/0")}
+                className="btn-secondary text-xs py-1 border border-yellow-700 text-yellow-400"
+              >
+                ⚠ Allow from anywhere
+              </button>
+            </div>
+            {form.relay_hosts === "0.0.0.0/0" && (
+              <p className="text-xs text-yellow-400 mt-2 bg-yellow-900/20 border border-yellow-800 rounded-lg px-3 py-2">
+                Warning: This makes KumoMTA an open relay. Only use this if you have firewall rules blocking port 25 from the internet, or if your app is on a different server.
+              </p>
+            )}
           </div>
         </div>
 

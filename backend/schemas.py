@@ -123,6 +123,7 @@ class SettingsUpdate(BaseModel):
     kumomta_port: Optional[int] = None
     kumomta_api_port: Optional[int] = None
     config_dir: Optional[str] = None
+    relay_hosts: Optional[str] = None
 
 
 class SettingsOut(BaseModel):
@@ -130,3 +131,4 @@ class SettingsOut(BaseModel):
     kumomta_port: int
     kumomta_api_port: int
     config_dir: str
+    relay_hosts: str
