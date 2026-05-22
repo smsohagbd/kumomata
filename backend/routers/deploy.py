@@ -28,21 +28,36 @@ def _write_file(path: str, content: str):
 
 def _reload_kumomta() -> dict:
     """
-    Sends SIGHUP to KumoMTA to reload its config.
-    Returns {"ok": True} or {"ok": False, "error": "..."}
+    Reloads or restarts KumoMTA after config change.
+    Tries reload first (graceful); falls back to restart if stopped.
     """
     try:
+        # Check if the service is currently active
+        active = subprocess.run(
+            ["systemctl", "is-active", "kumomta"],
+            capture_output=True, text=True, timeout=5,
+        )
+        is_active = active.stdout.strip() == "active"
+
+        # Use reload if running (no connection drop), restart if stopped
+        action = "reload" if is_active else "restart"
         result = subprocess.run(
-            ["systemctl", "reload", "kumomta"],
-            capture_output=True,
-            text=True,
-            timeout=10,
+            ["systemctl", action, "kumomta"],
+            capture_output=True, text=True, timeout=15,
         )
         if result.returncode == 0:
-            return {"ok": True}
-        return {"ok": False, "error": result.stderr.strip() or "reload failed"}
+            return {"ok": True, "action": action}
+        # If reload failed, fall back to restart
+        if action == "reload":
+            result2 = subprocess.run(
+                ["systemctl", "restart", "kumomta"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if result2.returncode == 0:
+                return {"ok": True, "action": "restart"}
+            return {"ok": False, "error": result2.stderr.strip() or "restart failed"}
+        return {"ok": False, "error": result.stderr.strip() or f"{action} failed"}
     except FileNotFoundError:
-        # systemctl not available (e.g. running on Windows for dev)
         return {"ok": False, "error": "systemctl not found — are you running on Linux?"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
