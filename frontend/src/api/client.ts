@@ -52,6 +52,8 @@ export const getDeployStatus = () => api.get("/api/deploy/status").then(d);
 
 // --- Auto-deploy (silent background deploy after any config change) ---
 export const autoDeploy = () => api.post("/api/deploy/config").then(d).catch(() => null);
+export const testSmtp = () => api.post("/api/deploy/test-smtp").then(d);
+export const clearQueue = () => api.post("/api/deploy/clear-queue").then(d);
 
 // --- Logs ---
 export const getKumoLogs = (lines = 100) => api.get(`/api/logs/kumomta?lines=${lines}`).then(d);

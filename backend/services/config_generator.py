@@ -124,11 +124,15 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
     default_pool = list(pools.keys())[0] if pools else "default"
     lines += [
         "-- -------------------------------------------------------",
-        "-- Queue config: assign egress pool",
+        "-- Queue config: assign egress pool and retry limits",
         "-- -------------------------------------------------------",
         "kumo.on('get_queue_config', function(domain, tenant, campaign, routing_domain)",
         f"  return kumo.make_queue_config {{",
         f"    egress_pool = '{default_pool}',",
+        "    -- Retry for up to 2 hours, then give up (prevents endless retry loops)",
+        "    max_age = '2 hours',",
+        "    -- Wait 30 minutes between retries (max ~3 attempts total)",
+        "    retry_interval = '30 minutes',",
         "  }",
         "end)",
         "",

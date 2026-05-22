@@ -140,6 +140,74 @@ def deploy_config(db: Session = Depends(get_db)):
     }
 
 
+@router.post("/test-smtp")
+async def test_smtp():
+    """
+    Test SMTP handshake on localhost:25.
+    Connects, sends EHLO, checks response — does NOT send any mail.
+    """
+    import asyncio
+    import socket
+
+    result = {"connected": False, "ehlo": False, "banner": "", "capabilities": [], "error": ""}
+    try:
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection("127.0.0.1", 25), timeout=5
+        )
+        banner = (await asyncio.wait_for(reader.readline(), timeout=5)).decode(errors="replace").strip()
+        result["banner"] = banner
+        if not banner.startswith("220"):
+            result["error"] = f"Unexpected banner: {banner}"
+            writer.close()
+            return result
+        result["connected"] = True
+
+        # Send EHLO
+        hostname = socket.gethostname()
+        writer.write(f"EHLO {hostname}\r\n".encode())
+        await writer.drain()
+        caps = []
+        while True:
+            line = (await asyncio.wait_for(reader.readline(), timeout=5)).decode(errors="replace").strip()
+            caps.append(line)
+            if line.startswith("250 ") or (not line.startswith("250")):
+                break
+        result["capabilities"] = caps
+        result["ehlo"] = any(l.startswith("250") for l in caps)
+
+        # Graceful quit
+        writer.write(b"QUIT\r\n")
+        await writer.drain()
+        writer.close()
+    except asyncio.TimeoutError:
+        result["error"] = "Connection timed out — is KumoMTA running and listening on port 25?"
+    except ConnectionRefusedError:
+        result["error"] = "Connection refused — KumoMTA is not listening on port 25"
+    except Exception as e:
+        result["error"] = str(e)
+
+    return result
+
+
+@router.post("/clear-queue")
+async def clear_queue():
+    """
+    Bounce all queued messages via KumoMTA admin API.
+    Useful to flush stuck/retrying messages.
+    """
+    import httpx
+    KUMOMTA_API = os.getenv("KUMOMTA_API", "http://127.0.0.1:8001")
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{KUMOMTA_API}/api/admin/bounce/v1",
+                json={"everything": True, "reason": "Manually cleared via panel"},
+            )
+            return {"ok": resp.status_code < 300, "status": resp.status_code, "detail": resp.text}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @router.get("/status")
 def deploy_status():
     """Check whether the policy directory and KumoMTA service are accessible."""

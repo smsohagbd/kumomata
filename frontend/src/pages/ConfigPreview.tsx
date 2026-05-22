@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { FileCode, Download, RefreshCw, Copy, Check, Rocket, ServerCrash, Server } from "lucide-react";
+import { FileCode, Download, RefreshCw, Copy, Check, Rocket, ServerCrash, Server, Wifi, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";
-import { exportConfig, deployConfig, getDeployStatus } from "../api/client";
+import { exportConfig, deployConfig, getDeployStatus, testSmtp, clearQueue } from "../api/client";
 
 interface DeployStatus {
   policy_dir: string;
@@ -33,6 +33,15 @@ export default function ConfigPreview() {
   const [deploying, setDeploying] = useState(false);
   const [deployResult, setDeployResult] = useState<DeployResult | null>(null);
   const [deployError, setDeployError] = useState("");
+
+  // SMTP test
+  const [testingSmtp, setTestingSmtp] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [smtpResult, setSmtpResult] = useState<any>(null);
+
+  // Clear queue
+  const [clearingQueue, setClearingQueue] = useState(false);
+  const [clearResult, setClearResult] = useState("");
 
   useEffect(() => {
     getDeployStatus()
@@ -99,6 +108,34 @@ export default function ConfigPreview() {
   };
 
   const canDeploy = deployStatus?.policy_dir_writable && deployStatus?.policy_dir_exists;
+
+  const handleTestSmtp = async () => {
+    setTestingSmtp(true);
+    setSmtpResult(null);
+    try {
+      const res = await testSmtp();
+      setSmtpResult(res);
+    } catch {
+      setSmtpResult({ error: "Failed to reach backend" });
+    } finally {
+      setTestingSmtp(false);
+    }
+  };
+
+  const handleClearQueue = async () => {
+    if (!confirm("This will bounce ALL queued messages. Continue?")) return;
+    setClearingQueue(true);
+    setClearResult("");
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res: any = await clearQueue();
+      setClearResult(res.ok ? "Queue cleared — all stuck messages bounced." : `Failed: ${res.error || res.detail}`);
+    } catch {
+      setClearResult("Failed to clear queue");
+    } finally {
+      setClearingQueue(false);
+    }
+  };
 
   return (
     <div>
@@ -202,6 +239,65 @@ export default function ConfigPreview() {
             {deployError}
           </div>
         )}
+
+        {/* SMTP Test + Clear Queue */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Test SMTP */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-medium text-white text-sm flex items-center gap-2">
+                  <Wifi size={14} className="text-blue-400" /> Test SMTP Handshake
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">Verify KumoMTA accepts connections on port 25</p>
+              </div>
+              <button onClick={handleTestSmtp} disabled={testingSmtp} className="btn-secondary text-xs py-1.5">
+                {testingSmtp ? <RefreshCw size={13} className="animate-spin" /> : <Wifi size={13} />}
+                {testingSmtp ? "Testing..." : "Test"}
+              </button>
+            </div>
+            {smtpResult && (
+              <div className={`rounded-lg px-3 py-2 text-xs font-mono space-y-1 ${smtpResult.ehlo ? "bg-green-900/20 text-green-300" : "bg-red-900/20 text-red-400"}`}>
+                {smtpResult.error ? (
+                  <p>❌ {smtpResult.error}</p>
+                ) : (
+                  <>
+                    <p>{smtpResult.connected ? "✓" : "✗"} Connected to port 25</p>
+                    <p>{smtpResult.ehlo ? "✓" : "✗"} EHLO handshake</p>
+                    {smtpResult.banner && <p className="text-gray-400">Banner: {smtpResult.banner}</p>}
+                    {smtpResult.capabilities?.slice(0, 5).map((c: string, i: number) => (
+                      <p key={i} className="text-gray-500">{c}</p>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Clear Queue */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-medium text-white text-sm flex items-center gap-2">
+                  <Trash2 size={14} className="text-red-400" /> Clear Message Queue
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">Bounce all stuck/retrying messages immediately</p>
+              </div>
+              <button onClick={handleClearQueue} disabled={clearingQueue} className="btn-danger text-xs py-1.5">
+                {clearingQueue ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                {clearingQueue ? "Clearing..." : "Clear Queue"}
+              </button>
+            </div>
+            {clearResult && (
+              <p className={`text-xs rounded-lg px-3 py-2 ${clearResult.includes("cleared") ? "bg-green-900/20 text-green-400" : "bg-red-900/20 text-red-400"}`}>
+                {clearResult}
+              </p>
+            )}
+            <p className="text-xs text-gray-600 mt-2">
+              Emails retry for up to 2 hours (max 3 attempts), then expire automatically.
+            </p>
+          </div>
+        </div>
 
         {/* Manual copy fallback */}
         <div className="card">
