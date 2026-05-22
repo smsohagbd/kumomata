@@ -192,26 +192,34 @@ async def test_smtp():
 @router.post("/clear-queue")
 async def clear_queue(domain: str = ""):
     """
-    Bounce queued messages via KumoMTA admin API.
-    Pass domain= to cancel only messages for a specific destination domain.
-    Leave empty to bounce everything.
+    Cancel/bounce queued messages via KumoMTA admin API.
+    domain= : cancel only that destination domain (e.g. gmail.com)
+    empty   : cancel everything in the queue
     """
     import httpx
     KUMOMTA_API = os.getenv("KUMOMTA_API", "http://127.0.0.1:8001")
-    payload: dict = {"reason": "Manually cleared via panel"}
-    if domain:
-        payload["domain"] = domain
-    else:
-        payload["everything"] = True
-    try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(
-                f"{KUMOMTA_API}/api/admin/bounce/v1",
-                json=payload,
-            )
-            return {"ok": resp.status_code < 300, "status": resp.status_code, "detail": resp.text}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
+
+    # KumoMTA admin bounce API — try v1 first, fall back to older path
+    for endpoint in ["/api/admin/bounce/v1", "/api/admin/bounce"]:
+        payload: dict = {"reason": "Cancelled via panel"}
+        if domain:
+            payload["domain"] = domain
+        else:
+            payload["everything"] = True
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.post(f"{KUMOMTA_API}{endpoint}", json=payload)
+                if resp.status_code != 404:
+                    return {
+                        "ok": resp.status_code < 300,
+                        "status": resp.status_code,
+                        "detail": resp.text,
+                        "endpoint": endpoint,
+                    }
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    return {"ok": False, "error": "KumoMTA bounce API not found"}
 
 
 @router.get("/status")

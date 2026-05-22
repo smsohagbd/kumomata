@@ -23,6 +23,7 @@ interface EmailRecord {
   egress_source: string;
   bounce_class: string;
   id: string;
+  db_id?: number;
 }
 
 type MainTab = "email" | "system";
@@ -142,27 +143,35 @@ function EmailLogs() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const handleDeleteRow = async (dbId: number, queue: string) => {
-    if (!confirm(`Cancel & delete this message?\nQueue: ${queue || "unknown"}`)) return;
-    setDeleting(dbId);
+  const handleDeleteRow = async (r: EmailRecord & { db_id?: number }) => {
+    const dest = r.queue || r.recipient?.split("@")[1] || "";
+    if (!confirm(`Cancel & remove this message?\nTo: ${r.recipient}\nQueue: ${dest || "unknown"}`)) return;
+    setDeleting(r.db_id ?? -1);
     try {
-      // Cancel in KumoMTA queue (by domain) + delete from log DB
-      if (queue) await clearQueueByDomain(queue);
-      await deleteEmailLog(dbId);
+      // 1. Cancel in KumoMTA queue by destination domain
+      if (dest) await clearQueueByDomain(dest);
+      // 2. Delete from DB if it came from DB
+      if (r.db_id) await deleteEmailLog(r.db_id);
       await load(page, filter);
+    } catch {
+      alert("Delete failed — check server logs");
     } finally {
       setDeleting(null);
     }
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Delete ALL ${FILTER_LABELS[filter]} log entries? This also cancels queued messages.`)) return;
+    if (!confirm(`This will:\n1. Cancel ALL queued messages in KumoMTA\n2. Delete all ${FILTER_LABELS[filter]} log entries from DB\n\nContinue?`)) return;
     setBulkDeleting(true);
     try {
-      if (filter === "retry") await clearQueueByDomain(""); // clear all retrying
+      // Cancel from KumoMTA queue
+      await clearQueueByDomain("");
+      // Delete from DB
       await deleteEmailLogsByType(filter);
       setPage(0);
       await load(0, filter);
+    } catch {
+      alert("Bulk delete failed — check server logs");
     } finally {
       setBulkDeleting(false);
     }
@@ -285,8 +294,8 @@ function EmailLogs() {
                   {canDelete && (
                     <td>
                       <button
-                        onClick={() => handleDeleteRow((r as EmailRecord & { db_id: number }).db_id, r.queue)}
-                        disabled={deleting === (r as EmailRecord & { db_id: number }).db_id}
+                        onClick={() => handleDeleteRow(r as EmailRecord & { db_id?: number })}
+                        disabled={deleting !== null}
                         className="btn-ghost p-1 text-red-400 hover:text-red-300"
                         title="Cancel & delete"
                       >
