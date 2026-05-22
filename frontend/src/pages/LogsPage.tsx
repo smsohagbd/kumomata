@@ -86,22 +86,44 @@ function EmailLogs() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const TYPE_FILTER_MAP: Record<FilterType, string> = {
+    all:       "",
+    received:  "Reception",
+    delivered: "Delivery",
+    retry:     "TransientFailure",
+    failed:    "Bounce",
+  };
+
   const load = async (p = page, f = filter) => {
     setLoading(true);
     try {
+      // 1. Try DB (populated if webhook is configured in KumoMTA)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let data: any = await getEmailLogsRealtime(PAGE_SIZE, p * PAGE_SIZE, f);
-      if (data.records && (data.total > 0 || f !== "all")) {
-        setRecords(data.records || []);
-        setTotal(data.total || 0);
+      const dbData: any = await getEmailLogsRealtime(PAGE_SIZE, p * PAGE_SIZE, f);
+
+      if (dbData.total > 0) {
+        setRecords(dbData.records || []);
+        setTotal(dbData.total || 0);
         setError("");
-      } else {
-        // Fall back to file reader only on first page with no filter
-        data = await getEmailLogs(PAGE_SIZE);
-        setRecords(data.records || []);
-        setTotal(data.records?.length || 0);
-        setError(data.error || "");
+        return;
       }
+
+      // 2. Fall back to file reader (always works, filter client-side)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fileData: any = await getEmailLogs(500);
+      if (fileData.error) {
+        setError(fileData.error);
+        setRecords([]);
+        setTotal(0);
+        return;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let all: any[] = fileData.records || [];
+      const typeFilter = TYPE_FILTER_MAP[f];
+      if (typeFilter) all = all.filter((r: EmailRecord) => r.type === typeFilter);
+      setTotal(all.length);
+      setRecords(all.slice(p * PAGE_SIZE, (p + 1) * PAGE_SIZE));
+      setError("");
     } catch {
       setError("Failed to load email logs");
     } finally {
