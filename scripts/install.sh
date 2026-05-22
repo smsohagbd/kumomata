@@ -49,26 +49,55 @@ success "System packages ready"
 if command -v kumod &>/dev/null; then
     warn "KumoMTA already installed — skipping"
 else
-    info "Adding KumoMTA repository..."
-    curl -1sLf 'https://repositories.kumomta.com/kumomta/setup.deb.sh' | bash
+    # Detect Ubuntu version (e.g. "22.04")
+    UBUNTU_VER=$(lsb_release -rs 2>/dev/null || echo "22.04")
+    ARCH=$(dpkg --print-architecture)  # amd64 or arm64
 
-    # Refresh package lists AFTER adding the new repo
-    info "Refreshing package lists..."
-    apt-get update -y -q
+    info "Detected Ubuntu ${UBUNTU_VER} (${ARCH})"
+    info "Fetching latest KumoMTA release info from GitHub..."
+
+    # Use GitHub API to get the latest release tag and find the right .deb URL
+    RELEASE_JSON=$(curl -fsSL "https://api.github.com/repos/KumoCorp/kumomta/releases/latest")
+    RELEASE_TAG=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+
+    info "Latest KumoMTA release: $RELEASE_TAG"
+
+    # Find the .deb URL matching our Ubuntu version and arch
+    DEB_URL=$(echo "$RELEASE_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+ubuntu_ver = '${UBUNTU_VER}'
+arch = '${ARCH}'
+for a in data['assets']:
+    url = a['browser_download_url']
+    if f'Ubuntu{ubuntu_ver}' in url and url.endswith(f'_{arch}.deb'):
+        print(url)
+        break
+")
+
+    if [ -z "$DEB_URL" ]; then
+        # Fallback: try Ubuntu 22.04 amd64 explicitly
+        DEB_URL=$(echo "$RELEASE_JSON" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for a in data['assets']:
+    url = a['browser_download_url']
+    if 'Ubuntu22.04' in url and url.endswith('_amd64.deb'):
+        print(url)
+        break
+")
+    fi
+
+    [ -z "$DEB_URL" ] && error "Could not find a .deb for Ubuntu ${UBUNTU_VER} ${ARCH}. Check https://github.com/KumoCorp/kumomta/releases"
+
+    DEB_FILE="/tmp/kumomta_latest.deb"
+    info "Downloading: $DEB_URL"
+    curl -fsSL -o "$DEB_FILE" "$DEB_URL" || error "Failed to download KumoMTA .deb"
 
     info "Installing KumoMTA..."
-    if apt-get install -y kumomta; then
-        success "KumoMTA installed"
-    else
-        warn "apt package not found — trying direct .deb install from GitHub releases..."
-        KUMO_VERSION="2024.11.08-d383b033"
-        KUMO_DEB="kumomta_${KUMO_VERSION}_amd64.deb"
-        KUMO_URL="https://github.com/KumoCorp/kumomta/releases/download/${KUMO_VERSION}/${KUMO_DEB}"
-        info "Downloading $KUMO_DEB ..."
-        curl -fsSL -o "/tmp/${KUMO_DEB}" "$KUMO_URL" || error "Failed to download KumoMTA .deb. Check https://github.com/KumoCorp/kumomta/releases for the latest version."
-        apt-get install -y "/tmp/${KUMO_DEB}"
-        success "KumoMTA installed from .deb"
-    fi
+    apt-get install -y "$DEB_FILE"
+    rm -f "$DEB_FILE"
+    success "KumoMTA installed (release: $RELEASE_TAG)"
 fi
 
 # ── STEP 3: Create directories ──────────────────────────────
