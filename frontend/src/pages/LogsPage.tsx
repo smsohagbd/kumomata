@@ -61,7 +61,7 @@ function EmailLogs() {
   const [error, setError] = useState("");
   const [lines, setLines] = useState(200);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [source, setSource] = useState<"realtime" | "files">("realtime");
+  const [source, setSource] = useState<"realtime" | "files" | "">("");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = async () => {
