@@ -61,7 +61,7 @@ function EmailLogs() {
   const [error, setError] = useState("");
   const [lines, setLines] = useState(200);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [source, setSource] = useState<"realtime" | "files" | "">("");
+  const [isRealtime, setIsRealtime] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = async () => {
@@ -71,12 +71,12 @@ function EmailLogs() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any = await getEmailLogsRealtime(lines);
       if (data.records && data.records.length > 0) {
-        setSource("realtime");
+        setIsRealtime(true);
         setRecords(data.records);
         setError("");
       } else {
         data = await getEmailLogs(lines);
-        setSource("files");
+        setIsRealtime(false);
         setRecords(data.records || []);
         setError(data.error || "");
       }
