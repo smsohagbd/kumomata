@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Query, Request, Depends
 from sqlalchemy.orm import Session
 from database import get_db
-import models
+import models  # noqa: F401 — used for EmailLog and SuppressedEmail
 
 try:
     import zstandard as zstd
@@ -224,6 +224,22 @@ async def receive_webhook(request: Request, db: Session = Depends(get_db)):
             bounce = rec.get("bounce_classification") or ""
             if isinstance(bounce, dict):
                 bounce = bounce.get("name", "") or bounce.get("category", "") or str(bounce)
+
+            # Auto-suppress permanently bounced addresses (5xx)
+            event_type = rec.get("type", "")
+            if event_type == "Bounce" and resp["code"] >= 500:
+                recipient = rec.get("recipient", "").lower().strip()
+                if recipient and "@" in recipient:
+                    existing = db.query(models.SuppressedEmail).filter(
+                        models.SuppressedEmail.email == recipient
+                    ).first()
+                    if not existing:
+                        db.add(models.SuppressedEmail(
+                            email=recipient,
+                            reason=f"{resp['code']} {resp['message'][:200]}",
+                            bounce_code=resp["code"],
+                            source="bounce",
+                        ))
 
             entry = models.EmailLog(
                 event_type=rec.get("type", "Unknown"),

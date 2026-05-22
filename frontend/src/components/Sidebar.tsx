@@ -8,6 +8,7 @@ import {
   Settings,
   Mail,
   ScrollText,
+  ShieldOff,
 } from "lucide-react";
 
 const nav = [
@@ -17,6 +18,7 @@ const nav = [
   { to: "/dkim", label: "DKIM Keys", icon: ShieldCheck },
   { to: "/config", label: "Config & Deploy", icon: FileCode },
   { to: "/logs", label: "Logs", icon: ScrollText },
+  { to: "/suppressions", label: "Suppression List", icon: ShieldOff },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 

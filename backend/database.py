@@ -52,6 +52,15 @@ def _migrate():
             )""",
             "CREATE INDEX IF NOT EXISTS ix_email_logs_event_type ON email_logs (event_type)",
             "CREATE INDEX IF NOT EXISTS ix_email_logs_created_at ON email_logs (created_at)",
+            """CREATE TABLE IF NOT EXISTS suppressed_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email VARCHAR NOT NULL UNIQUE,
+                reason VARCHAR,
+                bounce_code INTEGER,
+                source VARCHAR DEFAULT 'bounce',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_suppressed_emails_email ON suppressed_emails (email)",
         ]
         for sql in migrations:
             try:

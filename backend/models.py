@@ -68,6 +68,18 @@ class DKIMKey(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
+class SuppressedEmail(Base):
+    """Emails that permanently bounced — never send to these again."""
+    __tablename__ = "suppressed_emails"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    reason = Column(String, nullable=True)        # e.g. "550 5.1.1 user not found"
+    bounce_code = Column(Integer, nullable=True)  # e.g. 550
+    source = Column(String, default="bounce")     # "bounce" or "manual"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class EmailLog(Base):
     """Realtime delivery log events pushed by KumoMTA via webhook."""
     __tablename__ = "email_logs"

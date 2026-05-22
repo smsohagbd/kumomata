@@ -55,6 +55,11 @@ export const autoDeploy = () => api.post("/api/deploy/config").then(d).catch(() 
 export const testSmtp = () => api.post("/api/deploy/test-smtp").then(d);
 export const clearQueue = () => api.post("/api/deploy/clear-queue").then(d);
 
+// --- Suppressions ---
+export const getSuppressions = () => api.get("/api/suppressions").then(d);
+export const addSuppression = (email: string, reason?: string) => api.post("/api/suppressions", { email, reason }).then(d);
+export const deleteSuppression = (id: number) => api.delete(`/api/suppressions/${id}`).then(d);
+
 // --- Logs ---
 export const getKumoLogs = (lines = 100) => api.get(`/api/logs/kumomta?lines=${lines}`).then(d);
 export const getBackendLogs = (lines = 100) => api.get(`/api/logs/backend?lines=${lines}`).then(d);

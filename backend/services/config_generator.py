@@ -139,6 +139,31 @@ def generate_init_lua(ips: List[models.IPAddress], dkim_keys: List[models.DKIMKe
     ]
 
     # -----------------------------------------------------------
+    # Suppression list check: reject suppressed recipients at entry
+    # -----------------------------------------------------------
+    lines += [
+        "-- -------------------------------------------------------",
+        "-- Suppression check: reject known-bad addresses immediately",
+        "-- -------------------------------------------------------",
+        "kumo.on('smtp_server_rcpt_to', function(conn, rcpt)",
+        "  local email = rcpt.email",
+        "  local ok, response = pcall(function()",
+        "    local client = kumo.http.build_client {}",
+        "    return client",
+        "      :get('http://127.0.0.1:8050/api/suppressions/check?email=' .. email)",
+        "      :send()",
+        "  end)",
+        "  if ok and response:status_is_success() then",
+        "    local data = kumo.json_parse(response:text())",
+        "    if data.suppressed then",
+        "      kumo.reject(550, '5.1.1 ' .. email .. ' is on the suppression list: ' .. (data.reason or ''))",
+        "    end",
+        "  end",
+        "end)",
+        "",
+    ]
+
+    # -----------------------------------------------------------
     # DKIM signing
     # -----------------------------------------------------------
     if dkim_keys:
