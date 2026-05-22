@@ -42,8 +42,19 @@ echo ""
 # ── STEP 1: System packages ─────────────────────────────────
 info "Installing system packages..."
 apt-get update -y -q
-apt-get install -y -q curl git python3 python3-pip python3-venv nodejs npm
-success "System packages ready"
+apt-get install -y -q curl git python3 python3-pip python3-venv ca-certificates gnupg
+success "Base packages ready"
+
+# Install Node.js 20 LTS from NodeSource (Ubuntu's default is v12 — too old)
+NODE_MAJOR=20
+if node --version 2>/dev/null | grep -qE '^v(20|22|24)'; then
+    warn "Node.js $(node --version) already installed — skipping"
+else
+    info "Installing Node.js ${NODE_MAJOR} LTS (Ubuntu ships v12 which is too old)..."
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
+    apt-get install -y -q nodejs
+    success "Node.js $(node --version) installed"
+fi
 
 # ── STEP 2: Install KumoMTA ─────────────────────────────────
 if command -v kumod &>/dev/null; then
