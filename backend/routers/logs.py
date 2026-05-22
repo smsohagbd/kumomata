@@ -139,6 +139,8 @@ def email_logs(lines: int = Query(default=200, le=1000)):
         all_lines = []
         for filepath in reversed(log_files):
             try:
+                if os.path.getsize(filepath) == 0:
+                    continue  # skip empty/open segments
                 file_lines = [l for l in _read_log_file(filepath) if l.strip()]
                 all_lines.extend(reversed(file_lines))
                 if len(all_lines) >= lines:
